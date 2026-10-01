@@ -591,6 +591,8 @@ canvas {
 
   // ---------- 渲染 ----------
   function draw(now) {
+    // 部分安卓/微信切后台后会重置画布状态（缩放丢失→画面缩在左上角），每帧重设
+    ctx.setTransform(viewScale, 0, 0, viewScale, 0, 0);
     ctx.clearRect(0, 0, W, H);
     // 危险线
     const warn = dangerSince ? (Math.sin(now / 80) > 0 ? '#e2492f' : 'rgba(226,73,47,.3)') : 'rgba(59,42,20,.25)';
@@ -644,19 +646,24 @@ canvas {
   }
 
   // ---------- 尺寸 ----------
+  let viewScale = 1;
   function fit() {
     // 先让舞台撑满剩余空间量出可用尺寸，再收紧到画布高度，让顶栏/画布/进度条整体居中
     const stage = canvas.parentElement;
     stage.style.flex = ''; stage.style.height = '';
     const availH = stage.clientHeight - 6, availW = stage.clientWidth;
     const scale = Math.min(availW / W, availH / H);
-    const dpr = window.devicePixelRatio || 1;
+    // 像素密度封顶 2：3 倍屏肉眼看不出差别，画布却大一倍多，更容易被手机回收重置
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
     canvas.style.width = W * scale + 'px'; canvas.style.height = H * scale + 'px';
     canvas.width = W * scale * dpr; canvas.height = H * scale * dpr;
-    ctx.setTransform(scale * dpr, 0, 0, scale * dpr, 0, 0);
+    viewScale = scale * dpr;
+    ctx.setTransform(viewScale, 0, 0, viewScale, 0, 0);
     stage.style.flex = '0 0 auto'; stage.style.height = H * scale + 6 + 'px';
   }
   window.addEventListener('resize', fit);
+  canvas.addEventListener('contextrestored', fit);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) fit(); });
 
   // ---------- 输入 ----------
   function toGameX(e) {
