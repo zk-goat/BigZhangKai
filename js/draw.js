@@ -1,7 +1,7 @@
 // 画一个张楷：有照片画照片轮廓，没照片画一个带表情的彩色圆球。
 import { LEVELS, MAX, COLORS } from './config.js';
 import { skin, photoImg, shapeFor } from './skin.js';
-import { drawRays, drawShinyImage, drawSparkles, drawShinyRing } from './shine.js';
+import { drawGoldPhoto, drawTwinkle, drawGoldRing } from './shine.js';
 
 const NAME_MIN_R = 40;  // 半径小于它不写名字
 
@@ -20,9 +20,8 @@ function drawPhoto(ctx, r, lv, { s, sh, top, bottom, verts }, img, shiny) {
   const x = -sh.cx * s, y = -sh.cy * s, w = sh.w * s, h = sh.h * s;
   if (shiny) {
     const t = performance.now() / 1000;
-    drawRays(ctx, r, t);
-    drawShinyImage(ctx, img, x, y, w, h, r, t);
-    drawSparkles(ctx, verts, r, t);
+    drawGoldPhoto(ctx, img, x, y, w, h, r, t);
+    drawTwinkle(ctx, verts, r, t);
   } else {
     ctx.shadowColor = 'rgba(59,42,20,.35)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 2;
     ctx.drawImage(img, x, y, w, h);
@@ -33,7 +32,7 @@ function drawPhoto(ctx, r, lv, { s, sh, top, bottom, verts }, img, shiny) {
 }
 
 function drawBall(ctx, r, lv, shiny) {
-  if (shiny) drawShinyRing(ctx, r, performance.now() / 1000);
+  if (shiny) drawGoldRing(ctx, r);
   ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.fillStyle = LEVELS[lv].color; ctx.fill();
   drawFace(ctx, r);

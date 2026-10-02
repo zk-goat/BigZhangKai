@@ -71,15 +71,15 @@ function renderDots(top) {
   }));
 }
 
-// 闪光图鉴：14 格，见过的点亮
+// 黄金图鉴：14 格，见过的点亮
 function renderDex(seen) {
   const dex = loadDex();
-  $('dex-line').textContent = (seen > 0 ? `本局遇到闪光张楷 ×${seen}　` : '本局没遇到闪光　') + `闪光图鉴 ${dex.length}/${LEVELS.length}`;
+  $('dex-line').textContent = (seen > 0 ? `本局遇到黄金张楷 ×${seen}　` : '本局没遇到黄金张楷　') + `黄金图鉴 ${dex.length}/${LEVELS.length}`;
   $('dex-dots').replaceChildren(...LEVELS.map((_, i) => {
     const dot = document.createElement('span');
     dot.className = 'dex-dot' + (dex.includes(i) ? ' got' : '');
     dot.textContent = i + 1;
-    dot.title = skin[i].name + (dex.includes(i) ? '（见过闪光）' : '（还没见过闪光）');
+    dot.title = skin[i].name + (dex.includes(i) ? '（见过黄金版）' : '（还没见过黄金版）');
     return dot;
   }));
 }
@@ -120,7 +120,7 @@ export function gameOver() {
 
   shareText = `我在「合成大张楷」拿了 ${score} 分，最高合成到第 ${topLevel + 1} 级「${name}」，称号：${title}`
     + (isRecord ? '，刷新了我的最高纪录' : '')
-    + (state.shinySeen > 0 ? `，还遇到了 ${state.shinySeen} 个闪光张楷` : '')
+    + (state.shinySeen > 0 ? `，还遇到了 ${state.shinySeen} 个黄金张楷` : '')
     + (wonThisGame ? '。我已经合出大张楷了，你呢？' : '。你能合出大张楷吗？')
     + ' ' + SHARE_URL;
   $('copy-fallback').hidden = true;

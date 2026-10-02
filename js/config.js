@@ -64,8 +64,8 @@ export const SPAWN = [
   { minTop: 12, weights: [0.05, 0.1, 0.3, 0.6, 1, 1.2, 1.2, 1, 0.6] }
 ];
 
-// 闪光张楷：每个新出现的张楷（投放或合成产物）都有 chance 的概率是闪光；
-// 用闪光合成时结果按 inherit 概率保留闪光；scoreMul 是有闪光参与的那次合成的得分倍率
+// 黄金张楷（代码里叫 shiny）：每个新出现的张楷（投放或合成产物）都有 chance 的概率是黄金的；
+// 用黄金张楷合成时结果按 inherit 概率保留；scoreMul 是有黄金张楷参与的那次合成的得分倍率
 export const SHINY = { chance: 0.005, inherit: 0.5, scoreMul: 2 };
 
 // 照片转碰撞轮廓
