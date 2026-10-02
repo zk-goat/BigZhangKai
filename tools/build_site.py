@@ -22,9 +22,11 @@ def short_hash(data: bytes) -> str:
 
 
 def main():
-    if OUT.exists():
-        shutil.rmtree(OUT)
-    (OUT / "js").mkdir(parents=True)
+    # 只清空里面的内容、不删文件夹本身：Windows 上文件夹被占用（比如有程序的当前目录在这里）时删不掉
+    OUT.mkdir(exist_ok=True)
+    for child in OUT.iterdir():
+        shutil.rmtree(child) if child.is_dir() else child.unlink()
+    (OUT / "js").mkdir()
     (OUT / "css").mkdir()
     for d in COPY_DIRS:
         shutil.copytree(ROOT / d, OUT / d)
