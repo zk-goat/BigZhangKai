@@ -6,7 +6,7 @@ import { state } from './state.js';
 import { copyShare, gameOver } from './report.js';
 import { startGame, loop, fit, bindInput, makeKai, updateHud, debugSnapshot } from './game.js';
 import { bindSettings } from './settings.js';
-import { bindRankboard } from './rankboard.js';
+import { bindRankboard, flushPending } from './rankboard.js';
 import { $ } from './dom.js';
 
 function renderSoundBtn() {
@@ -50,6 +50,7 @@ async function boot() {
   startGame();
   requestAnimationFrame(loop);
   runTestHooks();
+  flushPending();
   if (document.fonts) document.fonts.ready.then(fit);
 }
 

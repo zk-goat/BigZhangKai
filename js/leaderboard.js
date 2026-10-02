@@ -3,7 +3,8 @@
 import { LEADERBOARD, MAX, STORAGE_KEYS } from './config.js';
 import { store } from './skin.js';
 
-const TIMEOUT_MS = 8000;
+const TIMEOUT_MS = 12000;
+const NETWORK_RETRIES = 1;
 
 export const leaderboardEnabled = () => Boolean(LEADERBOARD.url && LEADERBOARD.key);
 
@@ -23,7 +24,23 @@ function playerToken() {
   return sessionToken;
 }
 
-async function rpc(fn, args) {
+function networkError(message) {
+  const err = new Error(message);
+  err.network = true;
+  return err;
+}
+
+// 网络不通或超时自动重试；服务器明确拒绝（4xx/5xx）不重试
+async function rpc(fn, args, retries = NETWORK_RETRIES) {
+  try {
+    return await rpcOnce(fn, args);
+  } catch (err) {
+    if (err.network && retries > 0) return rpc(fn, args, retries - 1);
+    throw err;
+  }
+}
+
+async function rpcOnce(fn, args) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
   try {
@@ -37,8 +54,8 @@ async function rpc(fn, args) {
     const text = await res.text();
     return text ? JSON.parse(text) : null;  // 函数返回 null 时响应体可能为空
   } catch (err) {
-    if (err.name === 'AbortError') throw new Error('连接排行榜超时');
-    if (err instanceof TypeError) throw new Error('网络连不上排行榜');  // fetch 断网时抛 TypeError
+    if (err.name === 'AbortError') throw networkError('连接排行榜超时');
+    if (err instanceof TypeError) throw networkError('网络连不上排行榜');  // fetch 断网时抛 TypeError
     throw err;
   } finally {
     clearTimeout(timer);

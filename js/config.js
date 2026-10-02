@@ -74,7 +74,8 @@ export const STORAGE_KEYS = {
   muted: 'dazhangkai-muted',
   playerName: 'dazhangkai-name',
   playerToken: 'dazhangkai-player-token',
-  uploadedBest: 'dazhangkai-uploaded-best'
+  uploadedBest: 'dazhangkai-uploaded-best',
+  pendingRun: 'dazhangkai-pending-run'
 };
 
 export const SHARE_URL = 'zk-goat.github.io/BigZhangKai';

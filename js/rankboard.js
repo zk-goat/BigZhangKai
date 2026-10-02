@@ -9,6 +9,36 @@ import { leaderboardEnabled, fetchTop, submitScore, claimName, cleanName, canPer
 const playerName = () => store.get(STORAGE_KEYS.playerName) || '';
 const uploadedBest = () => Number(store.get(STORAGE_KEYS.uploadedBest)) || 0;
 
+// 没传上去的最好成绩（网络不通时暂存，联网后补传）
+function pendingRun() {
+  try {
+    const r = JSON.parse(store.get(STORAGE_KEYS.pendingRun) || 'null');
+    return r && Number.isFinite(r.score) && r.score > uploadedBest() ? r : null;
+  } catch { return null; }
+}
+function savePending(run) {
+  const old = pendingRun();
+  if (!old || run.score > old.score) store.set(STORAGE_KEYS.pendingRun, JSON.stringify(run));
+}
+const clearPending = () => store.set(STORAGE_KEYS.pendingRun, 'null');
+
+// 把一局成绩传上去：成功返回名次；本机身份不被认识返回 null
+async function uploadRun(run) {
+  const rank = await submitScore(run);
+  if (rank !== null) {
+    store.set(STORAGE_KEYS.uploadedBest, String(run.score));
+    clearPending();
+  }
+  return rank;
+}
+
+// 打开游戏时悄悄补传上次没传上去的成绩
+export async function flushPending() {
+  const run = pendingRun();
+  if (!leaderboardEnabled() || !playerName() || !run) return;
+  try { await uploadRun(run); } catch { /* 还是连不上，下次再试 */ }
+}
+
 let uploadedThisRound = false;
 let pausedByBoard = false;
 
@@ -38,7 +68,7 @@ async function loadRanking() {
     renderList(rows);
     $('rank-msg').textContent = rows.length ? '' : '还没有人上榜，玩一局去占第一';
   } catch (err) {
-    $('rank-msg').textContent = err.message + '，点刷新重试';
+    $('rank-msg').textContent = err.message + (err.network ? '，可以换个 WiFi 或流量，再点刷新' : '，点刷新重试');
   }
 }
 
@@ -87,15 +117,18 @@ async function autoUpload() {
     score: state.score, topLevel: state.topLevel, merges: state.mergeCount,
     durationS: (Date.now() - state.startedAt) / 1000
   };
+  // 之前有没传上去的更高分，就先补传那一局
+  const pending = pendingRun();
+  const toSend = pending && pending.score >= run.score ? pending : run;
   const best = uploadedBest();
-  if (run.score <= 0 || run.score <= best) {
+  if (toSend.score <= 0 || toSend.score <= best) {
     setMsg(best > 0 ? `本局没破纪录，榜上保留你的最高分 ${best}` : '本局 0 分，没有上传');
     return;
   }
   uploadedThisRound = true;
   setMsg('正在上榜…');
   try {
-    const rank = await submitScore(run);
+    const rank = await uploadRun(toSend);
     if (rank === null) {
       // 服务器不认识这台设备（换了浏览器/数据被清）：重新占一次昵称
       const oldName = playerName();
@@ -105,11 +138,15 @@ async function autoUpload() {
       setMsg('需要重新确认一下昵称');
       return;
     }
-    store.set(STORAGE_KEYS.uploadedBest, String(run.score));
-    setMsg(`已自动上榜，全班第 ${rank} 名`);
+    setMsg(toSend === run ? `已自动上榜，全班第 ${rank} 名` : `已补传之前的最高分 ${toSend.score}，全班第 ${rank} 名`);
   } catch (err) {
     uploadedThisRound = false;
-    showRetry(err.message);
+    if (err.network) {
+      savePending(toSend);
+      showRetry(err.message + '，成绩先存在手机里，下次联网自动补传。换个 WiFi 或流量也可以');
+    } else {
+      showRetry(err.message);
+    }
   }
 }
 
