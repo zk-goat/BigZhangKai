@@ -49,6 +49,11 @@ function runTestHooks() {
     makeKai(FIELD.width / 2 - 60, 250, MAX - 1);
     makeKai(FIELD.width / 2 + 60, 250, MAX - 1);
   }
+  // ?test=shiny：放几个闪光张楷，并让手上这个也是闪光，直接看效果
+  if (/[?&]test=shiny/.test(q)) {
+    [2, 5, 8, 11].forEach((lv, i) => makeKai(60 + i * 95, 300, lv, true));
+    state.currentShiny = true;
+  }
   if (/[?&]test=over/.test(q)) {
     setTimeout(() => {
       const score = Number((q.match(/[?&]score=(\d+)/) || [])[1]) || 1234;

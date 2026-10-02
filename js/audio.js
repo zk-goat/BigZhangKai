@@ -41,6 +41,11 @@ export const sfx = {
     const f = 330 * Math.pow(2, lv / 9 + Math.min(combo - 1, 6) / 12);
     tone(f, 0, 0.18); tone(f * 1.5, 0.07, 0.22, 0.12);
   },
+  // 闪光：快速上行的清脆琶音，最后一个高音带点余韵
+  shiny: () => {
+    [1047, 1319, 1568, 2093, 2637].forEach((f, i) => tone(f, i * 0.07, 0.28, 0.12, 'triangle'));
+    tone(3136, 0.38, 0.6, 0.07, 'sine');
+  },
   win: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.13, 0.35, 0.18)),
   over: () => [392, 330, 262].forEach((f, i) => tone(f, i * 0.18, 0.3, 0.14, 'sawtooth'))
 };

@@ -3,10 +3,12 @@ import { LEVELS, MAX, FIELD, PHYSICS, RULES, COLORS } from './config.js';
 import { skin, shapeFor, halfWidth } from './skin.js';
 import { popScale } from './geometry.js';
 import { spawnWeights, pickLevel } from './spawn.js';
+import { rollShiny, shinyMultiplier } from './variant.js';
+import { recordShiny } from './dex.js';
 import { drawKai } from './draw.js';
 import { sfx, unlockAudio } from './audio.js';
 import { state, resetRound, addScore } from './state.js';
-import { resetEffects, mergeEffects, applyShake, drawEffects } from './effects.js';
+import { resetEffects, mergeEffects, shinyEffects, applyShake, drawEffects } from './effects.js';
 import { showWin, gameOver } from './report.js';
 import { writeSave, clearSave } from './save.js';
 
@@ -45,14 +47,23 @@ function standUp() {
   });
 }
 
-export function makeKai(x, y, lv) {
+export function makeKai(x, y, lv, shiny = false) {
   const shape = shapeFor(lv);
   const b = shape
     ? Bodies.fromVertices(x, y, [shape.verts], PHYSICS.body)
     : Bodies.circle(x, y, LEVELS[lv].r, PHYSICS.body);
-  Object.assign(b, { kaiLevel: lv, kaiShaped: !!shape, bornAt: clock(), merged: false });
+  Object.assign(b, { kaiLevel: lv, kaiShaped: !!shape, kaiShiny: shiny, bornAt: clock(), merged: false });
   Composite.add(state.engine.world, b);
   return b;
+}
+
+// 闪光张楷出现：计数、记进图鉴、放特效和音效
+function announceShiny(b) {
+  if (silent) return;
+  state.shinySeen += 1;
+  recordShiny(b.kaiLevel);
+  shinyEffects({ x: b.position.x, y: b.position.y, now: clock() });
+  sfx.shiny();
 }
 
 // ---------- 合成 ----------
@@ -81,7 +92,8 @@ function mergePair(a, b) {
   a.merged = b.merged = true;
   const x = (a.position.x + b.position.x) / 2, y = (a.position.y + b.position.y) / 2;
   Composite.remove(state.engine.world, [a, b]);
-  const nb = makeKai(x, y, lv);
+  const parentShiny = Boolean(a.kaiShiny || b.kaiShiny);
+  const nb = makeKai(x, y, lv, rollShiny(parentShiny));
   nb.popAt = now;
   Body.setVelocity(nb, { x: 0, y: -1.5 });
 
@@ -91,13 +103,14 @@ function mergePair(a, b) {
   state.maxCombo = Math.max(state.maxCombo, state.combo);
   state.topLevel = Math.max(state.topLevel, lv);
   const base = lv * 2 + (state.combo >= 2 ? (state.combo - 1) * lv : 0);
-  const gain = Math.round(base * RULES.scoreScale) + (lv === MAX ? RULES.winBonus : 0);
+  const gain = Math.round(base * RULES.scoreScale * shinyMultiplier(parentShiny)) + (lv === MAX ? RULES.winBonus : 0);
   addScore(gain);
   if (silent) {
     if (lv === MAX) state.wonThisGame = true;
     return;
   }
-  mergeEffects({ x, y, lv, gain, combo: state.combo, now });
+  mergeEffects({ x, y, lv, gain, combo: state.combo, now, shiny: parentShiny || nb.kaiShiny });
+  if (nb.kaiShiny) announceShiny(nb);
   if (lv === MAX && !state.wonThisGame) showWin();
   else sfx.merge(lv, state.combo);
   updateHud();
@@ -122,10 +135,13 @@ let cooldownTimer = 0;
 export function drop() {
   const overlayOpen = document.querySelector('.overlay:not([hidden])');
   if (!state.engine || !state.canDrop || state.over || state.paused || overlayOpen) return;
-  makeKai(clampAim(state.current), FIELD.dropY, state.current);
+  const dropped = makeKai(clampAim(state.current), FIELD.dropY, state.current, state.currentShiny);
   sfx.drop();
+  if (dropped.kaiShiny) announceShiny(dropped);
   state.current = state.next;
+  state.currentShiny = state.nextShiny;
   state.next = randLevel();
+  state.nextShiny = rollShiny();
   state.canDrop = false;
   clearTimeout(cooldownTimer);
   cooldownTimer = setTimeout(() => { state.canDrop = true; }, RULES.dropCooldownMs);
@@ -185,9 +201,9 @@ export function simulateGames({ games = 10, table, thinkMs = 1000, aimRate = 0.7
 // 测试用：当前所有张楷的位置与等级（只在 ?debug 时挂到 window 上）
 export function debugSnapshot() {
   return {
-    over: state.over, paused: state.paused, score: state.score, topLevel: state.topLevel,
+    over: state.over, paused: state.paused, score: state.score, topLevel: state.topLevel, shinySeen: state.shinySeen,
     bodies: kaiBodies().map(b => ({
-      lv: b.kaiLevel, x: b.position.x, y: b.position.y,
+      lv: b.kaiLevel, shiny: Boolean(b.kaiShiny), x: b.position.x, y: b.position.y,
       minX: b.bounds.min.x, maxX: b.bounds.max.x, maxY: b.bounds.max.y, vy: b.velocity.y
     }))
   };
@@ -216,6 +232,8 @@ function enterRound(engine) {
 export function startGame() {
   enterRound(newEngine());
   state.next = randLevel();
+  state.currentShiny = rollShiny();
+  state.nextShiny = rollShiny();
   clearSave();
   updateHud();
 }
@@ -228,11 +246,12 @@ function snapshotGame() {
   return {
     bodies: kaiBodies().filter(b => !b.merged).map(b => ({
       lv: b.kaiLevel, x: Math.round(b.position.x * 10) / 10, y: Math.round(b.position.y * 10) / 10,
-      angle: Math.round(b.angle * 1000) / 1000
+      angle: Math.round(b.angle * 1000) / 1000, shiny: Boolean(b.kaiShiny)
     })),
     state: {
       score: state.score, topLevel: state.topLevel, current: state.current, next: state.next,
       mergeCount: state.mergeCount, maxCombo: state.maxCombo, wonThisGame: state.wonThisGame,
+      currentShiny: state.currentShiny, nextShiny: state.nextShiny, shinySeen: state.shinySeen,
       playedMs: Date.now() - state.startedAt
     }
   };
@@ -249,7 +268,7 @@ export function restoreGame(save) {
   enterRound(newEngine());
   const { playedMs, wonThisGame, ...rest } = save.state;
   Object.assign(state, rest, { wonThisGame, startedAt: Date.now() - playedMs });
-  save.bodies.forEach(({ lv, x, y, angle }) => Body.setAngle(makeKai(x, y, lv), angle));
+  save.bodies.forEach(({ lv, x, y, angle, shiny }) => Body.setAngle(makeKai(x, y, lv, shiny), angle));
   updateHud();
 }
 
@@ -273,16 +292,16 @@ function draw(now) {
     const x = clampAim(state.current);
     ctx.strokeStyle = 'rgba(59,42,20,.18)'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(x, FIELD.dropY); ctx.lineTo(x, H); ctx.stroke();
-    if (state.canDrop) drawKai(ctx, x, FIELD.dropY, LEVELS[state.current].r, state.current);
+    if (state.canDrop) drawKai(ctx, x, FIELD.dropY, LEVELS[state.current].r, state.current, 0, state.currentShiny);
   }
   ctx.font = '13px sans-serif'; ctx.fillStyle = COLORS.muted;
   ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
   ctx.fillText('下一个', W - 40, 24);
-  drawKai(ctx, W - 20, 24, 13, state.next);
+  drawKai(ctx, W - 20, 24, 13, state.next, 0, state.nextShiny);
 
   kaiBodies().forEach(b => {
     const pop = b.popAt ? popScale(now - b.popAt) : 1;
-    drawKai(ctx, b.position.x, b.position.y, LEVELS[b.kaiLevel].r * pop, b.kaiLevel, b.angle);
+    drawKai(ctx, b.position.x, b.position.y, LEVELS[b.kaiLevel].r * pop, b.kaiLevel, b.angle, b.kaiShiny);
   });
   drawEffects(ctx, now);
 }

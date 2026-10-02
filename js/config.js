@@ -64,6 +64,10 @@ export const SPAWN = [
   { minTop: 12, weights: [0.05, 0.1, 0.3, 0.6, 1, 1.2, 1.2, 1, 0.6] }
 ];
 
+// 闪光张楷：每个新出现的张楷（投放或合成产物）都有 chance 的概率是闪光；
+// 用闪光合成时结果按 inherit 概率保留闪光；scoreMul 是有闪光参与的那次合成的得分倍率
+export const SHINY = { chance: 0.005, inherit: 0.5, scoreMul: 2 };
+
 // 照片转碰撞轮廓
 export const TRACE = {
   maxSize: 240,       // 计算轮廓前缩到的最大边长
@@ -90,7 +94,8 @@ export const STORAGE_KEYS = {
   uploadedBest: 'dazhangkai-uploaded-best',
   pendingRun: 'dazhangkai-pending-run',
   save: 'dazhangkai-save-v1',
-  noticeSeen: 'dazhangkai-notice-seen'
+  noticeSeen: 'dazhangkai-notice-seen',
+  dex: 'dazhangkai-shiny-dex'
 };
 
 export const SHARE_URL = 'zk-goat.github.io/BigZhangKai';

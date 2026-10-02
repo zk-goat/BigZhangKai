@@ -210,3 +210,17 @@ canvas {
 .notice-item ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; font-size: .88rem; line-height: 1.55; color: var(--ink); }
 .notice-item + .notice-item { border-top: 2px dashed var(--line); padding-top: 12px; }
 .notice-item:not(.latest) ul { color: var(--muted); }
+
+/* 闪光图鉴 */
+.dex { width: 100%; display: grid; gap: 6px; }
+.dex-line { font-size: .8rem !important; color: var(--muted); }
+.dex-dots { display: grid; grid-template-columns: repeat(14, 1fr); gap: 3px; }
+.dex-dot {
+  aspect-ratio: 1; max-width: 100%; border-radius: 50%; display: grid; place-items: center;
+  font-size: .6rem; font-variant-numeric: tabular-nums; color: rgba(59,42,20,.4); background: rgba(59,42,20,.08);
+}
+.dex-dot.got {
+  color: #5a3b00; font-weight: 700;
+  background: radial-gradient(circle at 35% 30%, #fff6c8, #ffd54a 55%, #d48a00);
+  box-shadow: 0 0 6px rgba(255,200,40,.8);
+}

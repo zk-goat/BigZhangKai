@@ -25,13 +25,24 @@ export function readSave() {
     if (!s || s.v !== SAVE_VERSION || !Array.isArray(s.bodies) || !s.state) return null;
     const bodies = s.bodies.filter(b =>
       b && isLevel(b.lv) && isNum(b.x) && isNum(b.y) && isNum(b.angle)
-      && b.x >= 0 && b.x <= FIELD.width && b.y <= FIELD.height).slice(0, MAX_BODIES);
+      && b.x >= 0 && b.x <= FIELD.width && b.y <= FIELD.height)
+      .slice(0, MAX_BODIES)
+      .map(b => ({ lv: b.lv, x: b.x, y: b.y, angle: b.angle, shiny: b.shiny === true }));
     const st = s.state;
     const fields = ['score', 'topLevel', 'current', 'next', 'mergeCount', 'maxCombo', 'playedMs'];
     if (!fields.every(k => isNum(st[k]) && st[k] >= 0)) return null;
     if (![st.topLevel, st.current, st.next].every(isLevel)) return null;
     if (bodies.length === 0 && st.score === 0) return null;  // 刚开局什么都没有，不值得恢复
-    return { bodies, state: { ...st, wonThisGame: Boolean(st.wonThisGame) } };
+    return {
+      bodies,
+      state: {
+        ...st,
+        wonThisGame: Boolean(st.wonThisGame),
+        currentShiny: st.currentShiny === true,
+        nextShiny: st.nextShiny === true,
+        shinySeen: isNum(st.shinySeen) && st.shinySeen >= 0 ? st.shinySeen : 0
+      }
+    };
   } catch { return null; }
 }
 

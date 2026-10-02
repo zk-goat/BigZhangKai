@@ -217,6 +217,20 @@ canvas {
 .notice-item ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; font-size: .88rem; line-height: 1.55; color: var(--ink); }
 .notice-item + .notice-item { border-top: 2px dashed var(--line); padding-top: 12px; }
 .notice-item:not(.latest) ul { color: var(--muted); }
+
+/* 闪光图鉴 */
+.dex { width: 100%; display: grid; gap: 6px; }
+.dex-line { font-size: .8rem !important; color: var(--muted); }
+.dex-dots { display: grid; grid-template-columns: repeat(14, 1fr); gap: 3px; }
+.dex-dot {
+  aspect-ratio: 1; max-width: 100%; border-radius: 50%; display: grid; place-items: center;
+  font-size: .6rem; font-variant-numeric: tabular-nums; color: rgba(59,42,20,.4); background: rgba(59,42,20,.08);
+}
+.dex-dot.got {
+  color: #5a3b00; font-weight: 700;
+  background: radial-gradient(circle at 35% 30%, #fff6c8, #ffd54a 55%, #d48a00);
+  box-shadow: 0 0 6px rgba(255,200,40,.8);
+}
 </style>
 </head>
 <body>
@@ -311,6 +325,10 @@ canvas {
         <div><b id="stat-merges">0</b><span>合成次数</span></div>
         <div><b id="stat-combo">0</b><span>最大连击</span></div>
         <div><b id="stat-time">0:00</b><span>用时</span></div>
+      </div>
+      <div class="dex" id="dex">
+        <p class="dex-line" id="dex-line"></p>
+        <div class="dex-dots" id="dex-dots"></div>
       </div>
       <div class="board">
       <h3>本机最好 5 局</h3>
@@ -418,6 +436,10 @@ const SPAWN = [
   { minTop: 12, weights: [0.05, 0.1, 0.3, 0.6, 1, 1.2, 1.2, 1, 0.6] }
 ];
 
+// 闪光张楷：每个新出现的张楷（投放或合成产物）都有 chance 的概率是闪光；
+// 用闪光合成时结果按 inherit 概率保留闪光；scoreMul 是有闪光参与的那次合成的得分倍率
+const SHINY = { chance: 0.005, inherit: 0.5, scoreMul: 2 };
+
 // 照片转碰撞轮廓
 const TRACE = {
   maxSize: 240,       // 计算轮廓前缩到的最大边长
@@ -444,7 +466,8 @@ const STORAGE_KEYS = {
   uploadedBest: 'dazhangkai-uploaded-best',
   pendingRun: 'dazhangkai-pending-run',
   save: 'dazhangkai-save-v1',
-  noticeSeen: 'dazhangkai-notice-seen'
+  noticeSeen: 'dazhangkai-notice-seen',
+  dex: 'dazhangkai-shiny-dex'
 };
 
 const SHARE_URL = 'zk-goat.github.io/BigZhangKai';
@@ -686,6 +709,11 @@ const sfx = {
     const f = 330 * Math.pow(2, lv / 9 + Math.min(combo - 1, 6) / 12);
     tone(f, 0, 0.18); tone(f * 1.5, 0.07, 0.22, 0.12);
   },
+  // 闪光：快速上行的清脆琶音，最后一个高音带点余韵
+  shiny: () => {
+    [1047, 1319, 1568, 2093, 2637].forEach((f, i) => tone(f, i * 0.07, 0.28, 0.12, 'triangle'));
+    tone(3136, 0.38, 0.6, 0.07, 'sine');
+  },
   win: () => [523, 659, 784, 1047].forEach((f, i) => tone(f, i * 0.13, 0.35, 0.18)),
   over: () => [392, 330, 262].forEach((f, i) => tone(f, i * 0.18, 0.3, 0.14, 'sawtooth'))
 };
@@ -701,6 +729,9 @@ const state = {
   topLevel: 0,
   current: 0,
   next: 0,
+  currentShiny: false,
+  nextShiny: false,
+  shinySeen: 0,
   aimX: FIELD.width / 2,
   canDrop: true,
   over: false,
@@ -719,7 +750,7 @@ const state = {
 function resetRound(engine, firstNext) {
   Object.assign(state, {
     engine,
-    score: 0, topLevel: 0, current: 0, next: firstNext,
+    score: 0, topLevel: 0, current: 0, next: firstNext, currentShiny: false, nextShiny: false, shinySeen: 0,
     aimX: FIELD.width / 2, canDrop: true, over: false, paused: false, wonThisGame: false,
     dangerSince: 0, mergeCount: 0, maxCombo: 0, startedAt: Date.now(), combo: 0, lastMergeAt: 0
   });
@@ -733,32 +764,151 @@ function addScore(gain) {
   }
 }
 
+// ---- shine.js ----
+// 闪光张楷的画法：背后旋转金光 → 带呼吸金色光晕的照片（叠一层淡金色和周期扫过的流光）→ 轮廓上闪烁的星芒。
+// 坐标都以张楷中心为原点，调用前已经平移/旋转好。t 是秒。
+
+let buffer = null;  // 流光用的离屏画布，所有闪光张楷共用
+
+// 背后：一圈缓慢旋转的放射金光 + 柔和光团
+function drawRays(ctx, r, t) {
+  const R = r * 1.8, n = 12;
+  ctx.save();
+  ctx.rotate(t * 0.5);
+  // 背景是黄色，光芒用“中心白 → 外圈橙金”才看得清
+  const rays = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, R);
+  rays.addColorStop(0, 'rgba(255,255,255,.95)');
+  rays.addColorStop(0.45, 'rgba(255,170,30,.55)');
+  rays.addColorStop(1, 'rgba(255,140,0,0)');
+  ctx.fillStyle = rays;
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2, half = (Math.PI / n) * 0.5;
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, R, a - half, a + half); ctx.closePath(); ctx.fill();
+  }
+  ctx.restore();
+  const halo = ctx.createRadialGradient(0, 0, 0, 0, 0, r * 1.25);
+  halo.addColorStop(0, 'rgba(255,255,255,.8)');
+  halo.addColorStop(0.6, 'rgba(255,236,170,.35)');
+  halo.addColorStop(1, 'rgba(255,236,170,0)');
+  ctx.fillStyle = halo;
+  ctx.beginPath(); ctx.arc(0, 0, r * 1.25, 0, Math.PI * 2); ctx.fill();
+}
+
+// 照片本体：呼吸的金色外光 + 淡金色调 + 斜向扫过的流光（只落在人物轮廓里）
+function drawShinyImage(ctx, img, x, y, w, h, r, t) {
+  const pulse = 0.5 + 0.5 * Math.sin(t * 3);
+  ctx.save();
+  // 先一圈橙色描边勾出轮廓，再一圈会呼吸的亮白辉光
+  ctx.shadowColor = 'rgba(255,128,0,.95)';
+  ctx.shadowBlur = Math.max(3, r * 0.08);
+  ctx.drawImage(img, x, y, w, h);
+  ctx.shadowColor = `rgba(255,255,240,${0.75 + 0.25 * pulse})`;
+  ctx.shadowBlur = Math.max(8, r * (0.28 + 0.2 * pulse));
+  ctx.drawImage(img, x, y, w, h);
+  ctx.restore();
+
+  const bw = Math.max(1, Math.ceil(w)), bh = Math.max(1, Math.ceil(h));
+  buffer = buffer || document.createElement('canvas');
+  if (buffer.width < bw || buffer.height < bh) {
+    buffer.width = Math.max(buffer.width, bw);
+    buffer.height = Math.max(buffer.height, bh);
+  }
+  const b = buffer.getContext('2d');
+  b.setTransform(1, 0, 0, 1, 0, 0);
+  b.globalCompositeOperation = 'source-over';
+  b.clearRect(0, 0, buffer.width, buffer.height);
+  b.drawImage(img, 0, 0, bw, bh);
+  b.globalCompositeOperation = 'source-atop';  // 下面画的东西只留在人物轮廓里
+  b.fillStyle = 'rgba(255,200,60,.14)';
+  b.fillRect(0, 0, bw, bh);
+  // 每 2.4 秒扫过一次，扫完停一会儿
+  const span = bw + bh, p = ((t / 2.4) % 1) * 1.6 - 0.3;
+  if (p > -0.2 && p < 1.2) {
+    b.translate(bw / 2, bh / 2);
+    b.rotate(-0.6);
+    const cx = (p - 0.5) * span, band = Math.max(10, r * 0.45);
+    const g = b.createLinearGradient(cx - band, 0, cx + band, 0);
+    g.addColorStop(0, 'rgba(255,255,255,0)');
+    g.addColorStop(0.45, 'rgba(255,248,220,.55)');
+    g.addColorStop(0.5, 'rgba(255,255,255,.85)');
+    g.addColorStop(0.6, 'rgba(255,214,90,.4)');
+    g.addColorStop(1, 'rgba(255,255,255,0)');
+    b.fillStyle = g;
+    b.fillRect(-span, -span, span * 2, span * 2);
+  }
+  ctx.drawImage(buffer, 0, 0, bw, bh, x, y, w, h);
+}
+
+function star(ctx, x, y, s) {
+  ctx.beginPath();
+  ctx.moveTo(x, y - s);
+  ctx.quadraticCurveTo(x, y, x + s, y);
+  ctx.quadraticCurveTo(x, y, x, y + s);
+  ctx.quadraticCurveTo(x, y, x - s, y);
+  ctx.quadraticCurveTo(x, y, x, y - s);
+  ctx.fill();
+}
+
+// 轮廓上此起彼伏的四角星芒
+function drawSparkles(ctx, points, r, t) {
+  ctx.save();
+  ctx.shadowColor = 'rgba(255,140,0,.95)';
+  ctx.shadowBlur = 8;
+  ctx.fillStyle = '#ffffff';
+  points.forEach((pt, i) => {
+    const phase = Math.sin(t * 2.6 + i * 2.1);
+    if (phase < 0.35) return;
+    const s = Math.max(3, r * 0.17) * ((phase - 0.35) / 0.65);
+    star(ctx, pt.x * 1.08, pt.y * 1.08, s);
+  });
+  ctx.restore();
+}
+
+// 照片加载不出来时的兜底：金色描边圆圈
+function drawShinyRing(ctx, r, t) {
+  ctx.save();
+  ctx.lineWidth = Math.max(2, r * 0.12);
+  ctx.strokeStyle = `rgba(255,200,40,${0.7 + 0.3 * Math.sin(t * 3)})`;
+  ctx.beginPath(); ctx.arc(0, 0, r * 1.05, 0, Math.PI * 2); ctx.stroke();
+  ctx.restore();
+}
+
 // ---- draw.js ----
 // 画一个张楷：有照片画照片轮廓，没照片画一个带表情的彩色圆球。
 
 
+
 const NAME_MIN_R = 40;  // 半径小于它不写名字
 
-function drawKai(ctx, x, y, r, lv, angle = 0) {
+function drawKai(ctx, x, y, r, lv, angle = 0, shiny = false) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
   const shape = shapeFor(lv, r);
   const img = shape && photoImg(lv);
-  if (img) drawPhoto(ctx, r, lv, shape, img);
-  else drawBall(ctx, r, lv);
+  if (img) drawPhoto(ctx, r, lv, shape, img, shiny);
+  else drawBall(ctx, r, lv, shiny);
   ctx.restore();
 }
 
-function drawPhoto(ctx, r, lv, { s, sh, top, bottom }, img) {
-  ctx.shadowColor = 'rgba(59,42,20,.35)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 2;
-  ctx.drawImage(img, -sh.cx * s, -sh.cy * s, sh.w * s, sh.h * s);
-  ctx.shadowColor = 'transparent';
+function drawPhoto(ctx, r, lv, { s, sh, top, bottom, verts }, img, shiny) {
+  const x = -sh.cx * s, y = -sh.cy * s, w = sh.w * s, h = sh.h * s;
+  if (shiny) {
+    const t = performance.now() / 1000;
+    drawRays(ctx, r, t);
+    drawShinyImage(ctx, img, x, y, w, h, r, t);
+    drawSparkles(ctx, verts, r, t);
+  } else {
+    ctx.shadowColor = 'rgba(59,42,20,.35)'; ctx.shadowBlur = 4; ctx.shadowOffsetY = 2;
+    ctx.drawImage(img, x, y, w, h);
+    ctx.shadowColor = 'transparent';
+  }
   if (r >= NAME_MIN_R) drawName(ctx, r, lv, bottom * 0.45);
   if (lv === MAX) { ctx.translate(0, top + r * 0.98); drawCrown(ctx, r); }
 }
 
-function drawBall(ctx, r, lv) {
+function drawBall(ctx, r, lv, shiny) {
+  if (shiny) drawShinyRing(ctx, r, performance.now() / 1000);
   ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.fillStyle = LEVELS[lv].color; ctx.fill();
   drawFace(ctx, r);
@@ -803,9 +953,9 @@ function drawCrown(ctx, r) {
 }
 
 // 把某一级画进一个独立小画布（战报大图、进度格、庆祝画面、设置面板）
-function paintLevel(canvas, lv, { fill = 0.42, tries = 0 } = {}) {
+function paintLevel(canvas, lv, { fill = 0.42, tries = 0, shiny = false } = {}) {
   if (skin[lv].photo && !photoImg(lv) && tries < 20) {
-    setTimeout(() => paintLevel(canvas, lv, { fill, tries: tries + 1 }), 100);
+    setTimeout(() => paintLevel(canvas, lv, { fill, tries: tries + 1, shiny }), 100);
   }
   const pc = canvas.getContext('2d');
   pc.clearRect(0, 0, canvas.width, canvas.height);
@@ -813,7 +963,7 @@ function paintLevel(canvas, lv, { fill = 0.42, tries = 0 } = {}) {
   const shape = shapeFor(lv, base);
   const reach = shape ? Math.max(shape.ext, -shape.top, shape.bottom) : base;
   const r = base * Math.min(1, (canvas.height * fill) / reach);
-  drawKai(pc, canvas.width / 2, canvas.height / 2 + canvas.height * 0.04, r, lv);
+  drawKai(pc, canvas.width / 2, canvas.height / 2 + canvas.height * 0.04, r, lv, 0, shiny);
 }
 
 // ---- dom.js ----
@@ -1158,18 +1308,49 @@ function readSave() {
     if (!s || s.v !== SAVE_VERSION || !Array.isArray(s.bodies) || !s.state) return null;
     const bodies = s.bodies.filter(b =>
       b && isLevel(b.lv) && isNum(b.x) && isNum(b.y) && isNum(b.angle)
-      && b.x >= 0 && b.x <= FIELD.width && b.y <= FIELD.height).slice(0, MAX_BODIES);
+      && b.x >= 0 && b.x <= FIELD.width && b.y <= FIELD.height)
+      .slice(0, MAX_BODIES)
+      .map(b => ({ lv: b.lv, x: b.x, y: b.y, angle: b.angle, shiny: b.shiny === true }));
     const st = s.state;
     const fields = ['score', 'topLevel', 'current', 'next', 'mergeCount', 'maxCombo', 'playedMs'];
     if (!fields.every(k => isNum(st[k]) && st[k] >= 0)) return null;
     if (![st.topLevel, st.current, st.next].every(isLevel)) return null;
     if (bodies.length === 0 && st.score === 0) return null;  // 刚开局什么都没有，不值得恢复
-    return { bodies, state: { ...st, wonThisGame: Boolean(st.wonThisGame) } };
+    return {
+      bodies,
+      state: {
+        ...st,
+        wonThisGame: Boolean(st.wonThisGame),
+        currentShiny: st.currentShiny === true,
+        nextShiny: st.nextShiny === true,
+        shinySeen: isNum(st.shinySeen) && st.shinySeen >= 0 ? st.shinySeen : 0
+      }
+    };
   } catch { return null; }
+}
+
+// ---- dex.js ----
+// 闪光图鉴：本机见过哪些等级的闪光张楷。只存在本机。
+
+
+function loadDex() {
+  try {
+    const d = JSON.parse(store.get(STORAGE_KEYS.dex) || '[]');
+    return Array.isArray(d) ? [...new Set(d.filter(x => Number.isInteger(x) && x >= 0 && x <= MAX))] : [];
+  } catch { return []; }
+}
+
+// 记一笔；返回是不是第一次见到这一级的闪光
+function recordShiny(lv) {
+  const dex = loadDex();
+  if (dex.includes(lv)) return false;
+  store.set(STORAGE_KEYS.dex, JSON.stringify([...dex, lv]));
+  return true;
 }
 
 // ---- report.js ----
 // 结算：战报卡、本机前 5、复制战绩，以及合出大张楷时的庆祝画面。
+
 
 
 
@@ -1240,6 +1421,19 @@ function renderDots(top) {
   }));
 }
 
+// 闪光图鉴：14 格，见过的点亮
+function renderDex(seen) {
+  const dex = loadDex();
+  $('dex-line').textContent = (seen > 0 ? `本局遇到闪光张楷 ×${seen}　` : '本局没遇到闪光　') + `闪光图鉴 ${dex.length}/${LEVELS.length}`;
+  $('dex-dots').replaceChildren(...LEVELS.map((_, i) => {
+    const dot = document.createElement('span');
+    dot.className = 'dex-dot' + (dex.includes(i) ? ' got' : '');
+    dot.textContent = i + 1;
+    dot.title = skin[i].name + (dex.includes(i) ? '（见过闪光）' : '（还没见过闪光）');
+    return dot;
+  }));
+}
+
 let shareText = '';
 
 function gameOver() {
@@ -1271,10 +1465,12 @@ function gameOver() {
   $('stat-time').textContent = Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
   $('report-foot').textContent = '截图发群里 · ' + SHARE_URL;
   renderBoard(board, run);
+  renderDex(state.shinySeen);
   onRoundOver();
 
   shareText = `我在「合成大张楷」拿了 ${score} 分，最高合成到第 ${topLevel + 1} 级「${name}」，称号：${title}`
     + (isRecord ? '，刷新了我的最高纪录' : '')
+    + (state.shinySeen > 0 ? `，还遇到了 ${state.shinySeen} 个闪光张楷` : '')
     + (wonThisGame ? '。我已经合出大张楷了，你呢？' : '。你能合出大张楷吗？')
     + ' ' + SHARE_URL;
   $('copy-fallback').hidden = true;
@@ -1316,6 +1512,18 @@ function pickLevel(weights, rand = Math.random) {
   return weights.length - 1;
 }
 
+// ---- variant.js ----
+// 闪光张楷：随机出现、合成遗传、得分倍率。纯函数，可单独测试。
+
+// 新出现的张楷（投放或合成产物）是不是闪光；parentShiny 表示参与合成的两个里有没有闪光
+function rollShiny(parentShiny = false, rand = Math.random) {
+  if (parentShiny && rand() < SHINY.inherit) return true;
+  return rand() < SHINY.chance;
+}
+
+// 有闪光参与的那次合成得分倍率
+const shinyMultiplier = parentShiny => (parentShiny ? SHINY.scoreMul : 1);
+
 // ---- effects.js ----
 // 合成反馈：光圈、碎片、飘字、震屏、连击提示。只负责“看起来爽”，不影响玩法。
 
@@ -1326,13 +1534,16 @@ const MAX_PARTICLES = 260;
 
 let rings = [], particles = [], floats = [];
 let shakeUntil = 0, shakeAmp = 0, comboText = '', comboUntil = 0;
+let flashUntil = 0, bannerAt = -Infinity;
+const FLASH_MS = 450, BANNER_MS = 1700;
+const GOLDS = ['#ffd54a', '#ffe9a0', '#f2b705', '#fff6d6', '#e8a400'];
 
 function resetEffects() {
   rings = []; particles = []; floats = [];
-  shakeUntil = 0; comboUntil = 0;
+  shakeUntil = 0; comboUntil = 0; flashUntil = 0; bannerAt = -Infinity;
 }
 
-function mergeEffects({ x, y, lv, gain, combo, now }) {
+function mergeEffects({ x, y, lv, gain, combo, now, shiny = false }) {
   rings = [...rings, { x, y, r: LEVELS[lv].r, t: 0, lv }];
   floats = [...floats, { x, y: y - LEVELS[lv].r * 0.6, text: '+' + gain, t: 0 }];
   const n = 10 + lv * 2;
@@ -1340,7 +1551,7 @@ function mergeEffects({ x, y, lv, gain, combo, now }) {
     const ang = (Math.PI * 2 * i) / n + Math.random() * 0.4, sp = 2 + Math.random() * (2 + lv * 0.35);
     return {
       x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 1.5, life: 1,
-      size: 2 + Math.random() * (2 + lv * 0.25), color: LEVELS[lv].color
+      size: 2 + Math.random() * (2 + lv * 0.25), color: shiny ? GOLDS[i % GOLDS.length] : LEVELS[lv].color
     };
   });
   particles = [...particles, ...fresh].slice(-MAX_PARTICLES);
@@ -1352,6 +1563,42 @@ function mergeEffects({ x, y, lv, gain, combo, now }) {
     comboText = '连击 ×' + combo;
     comboUntil = now + 900;
   }
+}
+
+// 闪光张楷出现：画面泛金光、中央弹出字样、四周喷金色粒子
+function shinyEffects({ x, y, now }) {
+  flashUntil = now + FLASH_MS;
+  bannerAt = now;
+  const n = 36;
+  const fresh = Array.from({ length: n }, (_, i) => {
+    const ang = (Math.PI * 2 * i) / n + Math.random() * 0.2, sp = 3 + Math.random() * 5;
+    return { x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 2, life: 1, size: 2.5 + Math.random() * 3.5, color: GOLDS[i % GOLDS.length] };
+  });
+  particles = [...particles, ...fresh].slice(-MAX_PARTICLES);
+}
+
+function drawShinyBanner(ctx, now) {
+  const age = now - bannerAt;
+  if (age < 0 || age > BANNER_MS) return;
+  const inP = Math.min(1, age / 220), outP = Math.max(0, (age - (BANNER_MS - 350)) / 350);
+  const scale = 0.6 + 0.4 * (1 - Math.pow(1 - inP, 3)) + 0.04 * Math.sin(age / 90);
+  ctx.save();
+  ctx.globalAlpha = 1 - outP;
+  ctx.translate(FIELD.width / 2, FIELD.height * 0.34);
+  ctx.scale(scale, scale);
+  ctx.font = '44px "ZCOOL KuaiLe", sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const g = ctx.createLinearGradient(0, -22, 0, 22);
+  g.addColorStop(0, '#fffdf0'); g.addColorStop(0.4, '#ffe14d'); g.addColorStop(0.75, '#ffb000'); g.addColorStop(1, '#ff8a00');
+  ctx.shadowColor = 'rgba(255,255,255,.95)'; ctx.shadowBlur = 22;   // 外圈白色辉光
+  ctx.lineWidth = 8; ctx.strokeStyle = '#5a2e00';
+  ctx.strokeText('闪光张楷！', 0, 0);
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = g;
+  ctx.fillText('闪光张楷！', 0, 0);
+  ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(255,255,255,.8)';    // 字面一圈细亮边
+  ctx.strokeText('闪光张楷！', 0, -1);
+  ctx.restore();
 }
 
 // 在画面最开始调用：震屏偏移
@@ -1399,11 +1646,18 @@ function drawEffects(ctx, now) {
       ctx.fillText(skin[e.lv].name + '！', e.x, e.y - e.r - 10 - e.t * 20);
     }
   });
+  if (now < flashUntil) {
+    ctx.fillStyle = `rgba(255,224,130,${0.38 * (flashUntil - now) / FLASH_MS})`;
+    ctx.fillRect(-20, -20, FIELD.width + 40, FIELD.height + 40);
+  }
+  drawShinyBanner(ctx, now);
   ctx.fillStyle = COLORS.ink;
 }
 
 // ---- game.js ----
 // 游戏本体：物理世界、投放、合成、判负、主循环、画面适配和输入。
+
+
 
 
 
@@ -1449,14 +1703,23 @@ function standUp() {
   });
 }
 
-function makeKai(x, y, lv) {
+function makeKai(x, y, lv, shiny = false) {
   const shape = shapeFor(lv);
   const b = shape
     ? Bodies.fromVertices(x, y, [shape.verts], PHYSICS.body)
     : Bodies.circle(x, y, LEVELS[lv].r, PHYSICS.body);
-  Object.assign(b, { kaiLevel: lv, kaiShaped: !!shape, bornAt: clock(), merged: false });
+  Object.assign(b, { kaiLevel: lv, kaiShaped: !!shape, kaiShiny: shiny, bornAt: clock(), merged: false });
   Composite.add(state.engine.world, b);
   return b;
+}
+
+// 闪光张楷出现：计数、记进图鉴、放特效和音效
+function announceShiny(b) {
+  if (silent) return;
+  state.shinySeen += 1;
+  recordShiny(b.kaiLevel);
+  shinyEffects({ x: b.position.x, y: b.position.y, now: clock() });
+  sfx.shiny();
 }
 
 // ---------- 合成 ----------
@@ -1485,7 +1748,8 @@ function mergePair(a, b) {
   a.merged = b.merged = true;
   const x = (a.position.x + b.position.x) / 2, y = (a.position.y + b.position.y) / 2;
   Composite.remove(state.engine.world, [a, b]);
-  const nb = makeKai(x, y, lv);
+  const parentShiny = Boolean(a.kaiShiny || b.kaiShiny);
+  const nb = makeKai(x, y, lv, rollShiny(parentShiny));
   nb.popAt = now;
   Body.setVelocity(nb, { x: 0, y: -1.5 });
 
@@ -1495,13 +1759,14 @@ function mergePair(a, b) {
   state.maxCombo = Math.max(state.maxCombo, state.combo);
   state.topLevel = Math.max(state.topLevel, lv);
   const base = lv * 2 + (state.combo >= 2 ? (state.combo - 1) * lv : 0);
-  const gain = Math.round(base * RULES.scoreScale) + (lv === MAX ? RULES.winBonus : 0);
+  const gain = Math.round(base * RULES.scoreScale * shinyMultiplier(parentShiny)) + (lv === MAX ? RULES.winBonus : 0);
   addScore(gain);
   if (silent) {
     if (lv === MAX) state.wonThisGame = true;
     return;
   }
-  mergeEffects({ x, y, lv, gain, combo: state.combo, now });
+  mergeEffects({ x, y, lv, gain, combo: state.combo, now, shiny: parentShiny || nb.kaiShiny });
+  if (nb.kaiShiny) announceShiny(nb);
   if (lv === MAX && !state.wonThisGame) showWin();
   else sfx.merge(lv, state.combo);
   updateHud();
@@ -1526,10 +1791,13 @@ let cooldownTimer = 0;
 function drop() {
   const overlayOpen = document.querySelector('.overlay:not([hidden])');
   if (!state.engine || !state.canDrop || state.over || state.paused || overlayOpen) return;
-  makeKai(clampAim(state.current), FIELD.dropY, state.current);
+  const dropped = makeKai(clampAim(state.current), FIELD.dropY, state.current, state.currentShiny);
   sfx.drop();
+  if (dropped.kaiShiny) announceShiny(dropped);
   state.current = state.next;
+  state.currentShiny = state.nextShiny;
   state.next = randLevel();
+  state.nextShiny = rollShiny();
   state.canDrop = false;
   clearTimeout(cooldownTimer);
   cooldownTimer = setTimeout(() => { state.canDrop = true; }, RULES.dropCooldownMs);
@@ -1589,9 +1857,9 @@ function simulateGames({ games = 10, table, thinkMs = 1000, aimRate = 0.7, maxDr
 // 测试用：当前所有张楷的位置与等级（只在 ?debug 时挂到 window 上）
 function debugSnapshot() {
   return {
-    over: state.over, paused: state.paused, score: state.score, topLevel: state.topLevel,
+    over: state.over, paused: state.paused, score: state.score, topLevel: state.topLevel, shinySeen: state.shinySeen,
     bodies: kaiBodies().map(b => ({
-      lv: b.kaiLevel, x: b.position.x, y: b.position.y,
+      lv: b.kaiLevel, shiny: Boolean(b.kaiShiny), x: b.position.x, y: b.position.y,
       minX: b.bounds.min.x, maxX: b.bounds.max.x, maxY: b.bounds.max.y, vy: b.velocity.y
     }))
   };
@@ -1620,6 +1888,8 @@ function enterRound(engine) {
 function startGame() {
   enterRound(newEngine());
   state.next = randLevel();
+  state.currentShiny = rollShiny();
+  state.nextShiny = rollShiny();
   clearSave();
   updateHud();
 }
@@ -1632,11 +1902,12 @@ function snapshotGame() {
   return {
     bodies: kaiBodies().filter(b => !b.merged).map(b => ({
       lv: b.kaiLevel, x: Math.round(b.position.x * 10) / 10, y: Math.round(b.position.y * 10) / 10,
-      angle: Math.round(b.angle * 1000) / 1000
+      angle: Math.round(b.angle * 1000) / 1000, shiny: Boolean(b.kaiShiny)
     })),
     state: {
       score: state.score, topLevel: state.topLevel, current: state.current, next: state.next,
       mergeCount: state.mergeCount, maxCombo: state.maxCombo, wonThisGame: state.wonThisGame,
+      currentShiny: state.currentShiny, nextShiny: state.nextShiny, shinySeen: state.shinySeen,
       playedMs: Date.now() - state.startedAt
     }
   };
@@ -1653,7 +1924,7 @@ function restoreGame(save) {
   enterRound(newEngine());
   const { playedMs, wonThisGame, ...rest } = save.state;
   Object.assign(state, rest, { wonThisGame, startedAt: Date.now() - playedMs });
-  save.bodies.forEach(({ lv, x, y, angle }) => Body.setAngle(makeKai(x, y, lv), angle));
+  save.bodies.forEach(({ lv, x, y, angle, shiny }) => Body.setAngle(makeKai(x, y, lv, shiny), angle));
   updateHud();
 }
 
@@ -1677,16 +1948,16 @@ function draw(now) {
     const x = clampAim(state.current);
     ctx.strokeStyle = 'rgba(59,42,20,.18)'; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(x, FIELD.dropY); ctx.lineTo(x, H); ctx.stroke();
-    if (state.canDrop) drawKai(ctx, x, FIELD.dropY, LEVELS[state.current].r, state.current);
+    if (state.canDrop) drawKai(ctx, x, FIELD.dropY, LEVELS[state.current].r, state.current, 0, state.currentShiny);
   }
   ctx.font = '13px sans-serif'; ctx.fillStyle = COLORS.muted;
   ctx.textAlign = 'right'; ctx.textBaseline = 'middle';
   ctx.fillText('下一个', W - 40, 24);
-  drawKai(ctx, W - 20, 24, 13, state.next);
+  drawKai(ctx, W - 20, 24, 13, state.next, 0, state.nextShiny);
 
   kaiBodies().forEach(b => {
     const pop = b.popAt ? popScale(now - b.popAt) : 1;
-    drawKai(ctx, b.position.x, b.position.y, LEVELS[b.kaiLevel].r * pop, b.kaiLevel, b.angle);
+    drawKai(ctx, b.position.x, b.position.y, LEVELS[b.kaiLevel].r * pop, b.kaiLevel, b.angle, b.kaiShiny);
   });
   drawEffects(ctx, now);
 }
@@ -1916,6 +2187,16 @@ function bindWelcome() {
 // 更新公告：最新的放最前面。每次更新加一条，id 不能重复（打开游戏时，没看过最新一条的玩家会自动弹出）。
 const ANNOUNCEMENTS = [
   {
+    id: '2026-10-03-shiny',
+    date: '10 月 3 日',
+    title: '闪光张楷登场 ✨',
+    items: [
+      '每个新出现的张楷都有很小的概率是闪光张楷：金光环绕、流光闪烁，出现时会有专门的提示和音效',
+      '用闪光张楷合成，这一次得分翻倍；合出来的张楷有一半概率继续是闪光，可以一路带上去',
+      '战报卡上新增闪光图鉴：14 级张楷，你见过哪几级的闪光一目了然，看谁先集齐'
+    ]
+  },
+  {
     id: '2026-10-03',
     date: '10 月 3 日',
     title: '一局更快、存档和公告牌',
@@ -2045,6 +2326,11 @@ function runTestHooks() {
   if (/[?&]test=win/.test(q)) {
     makeKai(FIELD.width / 2 - 60, 250, MAX - 1);
     makeKai(FIELD.width / 2 + 60, 250, MAX - 1);
+  }
+  // ?test=shiny：放几个闪光张楷，并让手上这个也是闪光，直接看效果
+  if (/[?&]test=shiny/.test(q)) {
+    [2, 5, 8, 11].forEach((lv, i) => makeKai(60 + i * 95, 300, lv, true));
+    state.currentShiny = true;
   }
   if (/[?&]test=over/.test(q)) {
     setTimeout(() => {
