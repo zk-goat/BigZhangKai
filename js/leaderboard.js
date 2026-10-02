@@ -126,8 +126,15 @@ export async function listMessages(before = null) {
   return Array.isArray(rows) ? rows : [];
 }
 
-// 前 N 名，每人只取最高分；is_me 标出自己
-export async function fetchTop() {
-  const rows = await rpc('top_scores', { p_token: playerToken(), p_limit: LEADERBOARD.size });
+// 前 N 名，每人只取最高分；is_me 标出自己。week 为真时看周榜，weeksAgo = 1 是上周
+export async function fetchTop({ week = false, weeksAgo = 0, limit = LEADERBOARD.size } = {}) {
+  const rows = week
+    ? await rpc('top_scores_week', { p_token: playerToken(), p_limit: limit, p_weeks_ago: weeksAgo })
+    : await rpc('top_scores', { p_token: playerToken(), p_limit: limit });
   return Array.isArray(rows) ? rows : [];
+}
+
+// 自己在本周榜的名次；本周还没成绩返回 null
+export async function myWeekRank() {
+  return rpc('my_week_rank', { p_token: playerToken() });
 }

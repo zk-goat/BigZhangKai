@@ -1,13 +1,13 @@
 // 欢迎页：第一次打开时输入昵称（全班唯一）。已经有昵称的老玩家直接进游戏。
 // 连不上排行榜时也放行：昵称先存在本机，等下次上榜时再向服务器确认。
-import { STORAGE_KEYS, MAX } from './config.js?v=19e16d6c';
-import { store } from './skin.js?v=db8d0fbb';
-import { paintLevel } from './draw.js?v=978779ce';
-import { state } from './state.js?v=a3d7fb92';
+import { STORAGE_KEYS, MAX } from './config.js?v=70a9d4eb';
+import { store } from './skin.js?v=b3832cb8';
+import { paintLevel } from './draw.js?v=4b65a157';
+import { state } from './state.js?v=123f223b';
 import { $ } from './dom.js?v=5b57db68';
-import { leaderboardEnabled, claimName, cleanName, canPersist } from './leaderboard.js?v=4c1b28ad';
-import { makeAvatar, avatarEl } from './avatar.js?v=254699f4';
-import { uploadAvatar } from './profile.js?v=22b20b08';
+import { leaderboardEnabled, claimName, cleanName, canPersist } from './leaderboard.js?v=3d24f541';
+import { makeAvatar, avatarEl } from './avatar.js?v=bdd1ed8d';
+import { uploadAvatar } from './profile.js?v=afaeee37';
 
 export const needsWelcome = () => leaderboardEnabled() && !store.get(STORAGE_KEYS.playerName);
 
@@ -36,6 +36,7 @@ function enterGame(name) {
   store.set(STORAGE_KEYS.playerName, name);
   if (pendingAvatar) uploadAvatar(pendingAvatar).catch(() => { /* 头像已存本机，下次再传 */ });
   store.set(STORAGE_KEYS.uploadedBest, '0');
+  store.set(STORAGE_KEYS.weekBest, 'null');
   $('welcome').hidden = true;
   state.paused = false;
 }

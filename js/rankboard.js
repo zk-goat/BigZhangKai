@@ -1,26 +1,35 @@
 // 排行榜界面：顶栏“排行榜”弹窗 + 战报卡上的自动上榜。
-// 第一次结束时占一个昵称（全班唯一），以后每局结束自动上传；只有破了自己的纪录才传。
+// 第一次结束时占一个昵称（全班唯一），以后每局结束自动上传；破了自己本周最好成绩才传（历史最高自然也在里面）。
 import { STORAGE_KEYS } from './config.js';
 import { skin, store } from './skin.js';
 import { state } from './state.js';
 import { $ } from './dom.js';
-import { leaderboardEnabled, fetchTop, submitScore, claimName, cleanName, canPersist } from './leaderboard.js';
+import { leaderboardEnabled, fetchTop, myWeekRank, submitScore, claimName, cleanName, canPersist } from './leaderboard.js';
+import { weekKey, daysLeft } from './week.js';
 import { avatarEl, makeAvatar } from './avatar.js';
 import { myAvatar, uploadAvatar, renderMeBar } from './profile.js';
 
 const playerName = () => store.get(STORAGE_KEYS.playerName) || '';
 const uploadedBest = () => Number(store.get(STORAGE_KEYS.uploadedBest)) || 0;
 
-// 没传上去的最好成绩（网络不通时暂存，联网后补传）
+// 本周已经传上去的最好成绩（换了一周自动归零）
+function weekBest() {
+  try {
+    const w = JSON.parse(store.get(STORAGE_KEYS.weekBest) || 'null');
+    return w && w.week === weekKey() && Number.isFinite(w.score) ? w.score : 0;
+  } catch { return 0; }
+}
+
+// 没传上去的最好成绩（网络不通时暂存，联网后补传）；上周存下的不再补传，免得算进这周
 function pendingRun() {
   try {
     const r = JSON.parse(store.get(STORAGE_KEYS.pendingRun) || 'null');
-    return r && Number.isFinite(r.score) && r.score > uploadedBest() ? r : null;
+    return r && Number.isFinite(r.score) && r.week === weekKey() && r.score > weekBest() ? r : null;
   } catch { return null; }
 }
 function savePending(run) {
   const old = pendingRun();
-  if (!old || run.score > old.score) store.set(STORAGE_KEYS.pendingRun, JSON.stringify(run));
+  if (!old || run.score > old.score) store.set(STORAGE_KEYS.pendingRun, JSON.stringify({ ...run, week: weekKey() }));
 }
 const clearPending = () => store.set(STORAGE_KEYS.pendingRun, 'null');
 
@@ -28,7 +37,8 @@ const clearPending = () => store.set(STORAGE_KEYS.pendingRun, 'null');
 async function uploadRun(run) {
   const rank = await submitScore(run);
   if (rank !== null) {
-    store.set(STORAGE_KEYS.uploadedBest, String(run.score));
+    store.set(STORAGE_KEYS.uploadedBest, String(Math.max(uploadedBest(), run.score)));
+    store.set(STORAGE_KEYS.weekBest, JSON.stringify({ week: weekKey(), score: run.score }));
     clearPending();
   }
   return rank;
@@ -43,6 +53,7 @@ export async function flushPending() {
 
 let uploadedThisRound = false;
 let pausedByBoard = false;
+let scope = 'week';  // 'week' 本周榜 | 'all' 总榜
 
 // ---------- 排行榜弹窗 ----------
 function renderList(rows) {
@@ -64,12 +75,35 @@ function renderList(rows) {
   }));
 }
 
+function setScope(next) {
+  scope = next;
+  [['tab-week', 'week'], ['tab-all', 'all']].forEach(([id, s]) => {
+    $(id).classList.toggle('on', s === scope);
+    $(id).setAttribute('aria-selected', String(s === scope));
+  });
+  loadRanking();
+}
+
+async function showWeekInfo() {
+  const left = daysLeft();
+  $('rank-info').textContent = `每周一 0 点重新开始，还剩 ${left} 天`;
+  try {
+    const [champ] = await fetchTop({ week: true, weeksAgo: 1, limit: 1 });
+    if (champ && scope === 'week') $('rank-info').textContent = `上周冠军：${champ.name} · ${champ.score} 分
+还剩 ${left} 天重新开始`;
+  } catch { /* 拿不到上周冠军就只显示剩余天数 */ }
+}
+
 async function loadRanking() {
   $('rank-msg').textContent = '加载中…';
+  $('rank-list').replaceChildren();
+  if (scope === 'week') showWeekInfo();
+  else $('rank-info').textContent = '所有时间里每个人的最高分';
   try {
-    const rows = await fetchTop();
+    const rows = await fetchTop({ week: scope === 'week' });
     renderList(rows);
-    $('rank-msg').textContent = rows.length ? '' : '还没有人上榜，玩一局去占第一';
+    $('rank-msg').textContent = rows.length ? ''
+      : scope === 'week' ? '本周还没有人上榜，快去抢第一' : '还没有人上榜，玩一局去占第一';
   } catch (err) {
     $('rank-msg').textContent = err.message + (err.network ? '，可以换个 WiFi 或流量，再点刷新' : '，点刷新重试');
   }
@@ -80,7 +114,7 @@ function openBoard() {
   if (pausedByBoard) state.paused = true;
   $('rank').hidden = false;
   renderMeBar($('rank-me'), { size: 30, onChanged: loadRanking });
-  loadRanking();
+  setScope('week');
 }
 
 function closeBoard() {
@@ -139,11 +173,12 @@ async function autoUpload(reclaimed = false) {
   // 之前有没传上去的更高分，就先补传那一局
   const pending = pendingRun();
   const toSend = pending && pending.score >= run.score ? pending : run;
-  const best = uploadedBest();
-  if (toSend.score <= 0 || toSend.score <= best) {
-    setMsg(best > 0 ? `本局没破纪录，榜上保留你的最高分 ${best}` : '本局 0 分，没有上传');
+  const wb = weekBest();
+  if (toSend.score <= 0 || toSend.score <= wb) {
+    setMsg(wb > 0 ? `本周你最好是 ${wb} 分，这局没超过` : '本局 0 分，没有上传');
     return;
   }
+  const isRecord = toSend.score > uploadedBest();
   uploadedThisRound = true;
   setMsg('正在上榜…');
   try {
@@ -161,7 +196,10 @@ async function autoUpload(reclaimed = false) {
       setMsg(`「${oldName}」在你离线时被别人用了，换一个昵称`);
       return;
     }
-    setMsg(toSend === run ? `已自动上榜，全班第 ${rank} 名` : `已补传之前的最高分 ${toSend.score}，全班第 ${rank} 名`);
+    const wr = await myWeekRank().catch(() => null);
+    const ranks = (wr ? `本周第 ${wr} 名，` : '') + `总榜第 ${rank} 名`;
+    setMsg(toSend !== run ? `已补传之前的 ${toSend.score} 分：${ranks}`
+      : isRecord ? `新纪录！${ranks}` : `已上榜：${ranks}`);
   } catch (err) {
     uploadedThisRound = false;
     if (err.network) {
@@ -198,6 +236,7 @@ async function saveName() {
       setMsg(`昵称已改成「${name}」，之前的成绩也跟着改名`);
     } else {
       store.set(STORAGE_KEYS.uploadedBest, '0');
+      store.set(STORAGE_KEYS.weekBest, 'null');
       autoUpload();
     }
   } catch (err) {
@@ -228,6 +267,8 @@ export function bindRankboard() {
   $('btn-rank').addEventListener('click', openBoard);
   $('btn-rank-close').addEventListener('click', closeBoard);
   $('btn-rank-refresh').addEventListener('click', loadRanking);
+  $('tab-week').addEventListener('click', () => setScope('week'));
+  $('tab-all').addEventListener('click', () => setScope('all'));
   $('btn-upload').addEventListener('click', saveName);
   $('player-name').addEventListener('keydown', e => { if (e.key === 'Enter') saveName(); });
   $('btn-rename').addEventListener('click', () => showNameForm(playerName(), '保存'));

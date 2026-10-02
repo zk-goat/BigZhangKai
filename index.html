@@ -82,6 +82,11 @@
 <div class="overlay" id="rank" hidden>
   <div class="card rank-card">
     <h2>全班排行榜</h2>
+    <div class="rank-tabs" role="tablist">
+      <button id="tab-week" type="button" role="tab" aria-selected="true" class="on">本周</button>
+      <button id="tab-all" type="button" role="tab" aria-selected="false">总榜</button>
+    </div>
+    <p class="rank-info" id="rank-info"></p>
     <div class="me-bar" id="rank-me" hidden></div>
     <ol class="rank-list" id="rank-list"></ol>
     <p class="rank-msg" id="rank-msg" role="status"></p>

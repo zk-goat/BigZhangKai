@@ -36,6 +36,7 @@ function enterGame(name) {
   store.set(STORAGE_KEYS.playerName, name);
   if (pendingAvatar) uploadAvatar(pendingAvatar).catch(() => { /* 头像已存本机，下次再传 */ });
   store.set(STORAGE_KEYS.uploadedBest, '0');
+  store.set(STORAGE_KEYS.weekBest, 'null');
   $('welcome').hidden = true;
   state.paused = false;
 }

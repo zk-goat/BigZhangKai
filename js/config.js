@@ -96,7 +96,8 @@ export const STORAGE_KEYS = {
   save: 'dazhangkai-save-v1',
   noticeSeen: 'dazhangkai-notice-seen',
   dex: 'dazhangkai-shiny-dex',
-  avatar: 'dazhangkai-avatar'
+  avatar: 'dazhangkai-avatar',
+  weekBest: 'dazhangkai-week-best'
 };
 
 export const SHARE_URL = 'zk-goat.github.io/BigZhangKai';

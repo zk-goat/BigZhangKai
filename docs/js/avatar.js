@@ -1,5 +1,5 @@
 // 个人头像：选好的照片在手机上裁成正方形、压成 96×96 小图；没有头像时显示昵称首字的彩色圆。
-import { loadImage } from './trace.js?v=5b38dbae';
+import { loadImage } from './trace.js?v=f73bf07e';
 
 const SIZE = 96;
 const MAX_CHARS = 30000;   // 与数据库里的长度限制一致

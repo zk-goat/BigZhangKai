@@ -1,7 +1,7 @@
 // 全班排行榜的数据接口（Supabase RPC，见 supabase/002_unique_names.sql）。只负责读写数据，不碰页面。
 // 每台设备一个随机身份码：昵称第一次被谁占用就归谁，成绩也只能用自己的身份码提交。
-import { LEADERBOARD, MAX, STORAGE_KEYS } from './config.js?v=19e16d6c';
-import { store } from './skin.js?v=db8d0fbb';
+import { LEADERBOARD, MAX, STORAGE_KEYS } from './config.js?v=70a9d4eb';
+import { store } from './skin.js?v=b3832cb8';
 
 const TIMEOUT_MS = 12000;
 const NETWORK_RETRIES = 1;
@@ -126,8 +126,15 @@ export async function listMessages(before = null) {
   return Array.isArray(rows) ? rows : [];
 }
 
-// 前 N 名，每人只取最高分；is_me 标出自己
-export async function fetchTop() {
-  const rows = await rpc('top_scores', { p_token: playerToken(), p_limit: LEADERBOARD.size });
+// 前 N 名，每人只取最高分；is_me 标出自己。week 为真时看周榜，weeksAgo = 1 是上周
+export async function fetchTop({ week = false, weeksAgo = 0, limit = LEADERBOARD.size } = {}) {
+  const rows = week
+    ? await rpc('top_scores_week', { p_token: playerToken(), p_limit: limit, p_weeks_ago: weeksAgo })
+    : await rpc('top_scores', { p_token: playerToken(), p_limit: limit });
   return Array.isArray(rows) ? rows : [];
+}
+
+// 自己在本周榜的名次；本周还没成绩返回 null
+export async function myWeekRank() {
+  return rpc('my_week_rank', { p_token: playerToken() });
 }

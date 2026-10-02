@@ -272,6 +272,12 @@ label.linkish { cursor: pointer; }
 .me-msg { font-size: .75rem; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #rank-me { padding: 8px 10px; border-radius: 12px; background: rgba(226,73,47,.08); }
 .book-who.me-bar { font-size: .85rem; }
+
+/* 周榜 / 总榜切换 */
+.rank-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0; border: 2px solid var(--ink); border-radius: 999px; overflow: hidden; }
+.rank-tabs button { border: 0; border-radius: 0; padding: 6px 0; font-size: .9rem; background: var(--panel); color: var(--ink); }
+.rank-tabs button.on { background: var(--ink); color: var(--panel); }
+.rank-info { margin: 0; font-size: .8rem; color: var(--muted); text-align: center; min-height: 1.2em; white-space: pre-line; line-height: 1.6; }
 </style>
 </head>
 <body>
@@ -350,6 +356,11 @@ label.linkish { cursor: pointer; }
 <div class="overlay" id="rank" hidden>
   <div class="card rank-card">
     <h2>全班排行榜</h2>
+    <div class="rank-tabs" role="tablist">
+      <button id="tab-week" type="button" role="tab" aria-selected="true" class="on">本周</button>
+      <button id="tab-all" type="button" role="tab" aria-selected="false">总榜</button>
+    </div>
+    <p class="rank-info" id="rank-info"></p>
     <div class="me-bar" id="rank-me" hidden></div>
     <ol class="rank-list" id="rank-list"></ol>
     <p class="rank-msg" id="rank-msg" role="status"></p>
@@ -526,7 +537,8 @@ const STORAGE_KEYS = {
   save: 'dazhangkai-save-v1',
   noticeSeen: 'dazhangkai-notice-seen',
   dex: 'dazhangkai-shiny-dex',
-  avatar: 'dazhangkai-avatar'
+  avatar: 'dazhangkai-avatar',
+  weekBest: 'dazhangkai-week-best'
 };
 
 const SHARE_URL = 'zk-goat.github.io/BigZhangKai';
@@ -1145,10 +1157,40 @@ async function listMessages(before = null) {
   return Array.isArray(rows) ? rows : [];
 }
 
-// 前 N 名，每人只取最高分；is_me 标出自己
-async function fetchTop() {
-  const rows = await rpc('top_scores', { p_token: playerToken(), p_limit: LEADERBOARD.size });
+// 前 N 名，每人只取最高分；is_me 标出自己。week 为真时看周榜，weeksAgo = 1 是上周
+async function fetchTop({ week = false, weeksAgo = 0, limit = LEADERBOARD.size } = {}) {
+  const rows = week
+    ? await rpc('top_scores_week', { p_token: playerToken(), p_limit: limit, p_weeks_ago: weeksAgo })
+    : await rpc('top_scores', { p_token: playerToken(), p_limit: limit });
   return Array.isArray(rows) ? rows : [];
+}
+
+// 自己在本周榜的名次；本周还没成绩返回 null
+async function myWeekRank() {
+  return rpc('my_week_rank', { p_token: playerToken() });
+}
+
+// ---- week.js ----
+// 周榜的“这一周”：按北京时间，每周一 0 点开始。纯函数，可单独测试。
+const BJ_OFFSET_MS = 8 * 3600 * 1000;
+const DAY_MS = 24 * 3600 * 1000;
+
+// 本周一 0 点（北京时间）对应的时间戳
+function weekStart(now = Date.now()) {
+  const bj = new Date(now + BJ_OFFSET_MS);                    // 用 UTC 字段读出北京时间
+  const daysSinceMonday = (bj.getUTCDay() + 6) % 7;
+  const midnight = Date.UTC(bj.getUTCFullYear(), bj.getUTCMonth(), bj.getUTCDate());
+  return midnight - daysSinceMonday * DAY_MS - BJ_OFFSET_MS;
+}
+
+// 这一周的标识，比如 '2026-09-28'（那周的周一）
+function weekKey(now = Date.now()) {
+  return new Date(weekStart(now) + BJ_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+// 距离下周一 0 点还剩几天（不足一天算 1 天）
+function daysLeft(now = Date.now()) {
+  return Math.max(1, Math.ceil((weekStart(now) + 7 * DAY_MS - now) / DAY_MS));
 }
 
 // ---- avatar.js ----
@@ -1272,7 +1314,8 @@ function renderMeBar(el, { size = 28, onChanged } = {}) {
 
 // ---- rankboard.js ----
 // 排行榜界面：顶栏“排行榜”弹窗 + 战报卡上的自动上榜。
-// 第一次结束时占一个昵称（全班唯一），以后每局结束自动上传；只有破了自己的纪录才传。
+// 第一次结束时占一个昵称（全班唯一），以后每局结束自动上传；破了自己本周最好成绩才传（历史最高自然也在里面）。
+
 
 
 
@@ -1283,16 +1326,24 @@ function renderMeBar(el, { size = 28, onChanged } = {}) {
 const playerName = () => store.get(STORAGE_KEYS.playerName) || '';
 const uploadedBest = () => Number(store.get(STORAGE_KEYS.uploadedBest)) || 0;
 
-// 没传上去的最好成绩（网络不通时暂存，联网后补传）
+// 本周已经传上去的最好成绩（换了一周自动归零）
+function weekBest() {
+  try {
+    const w = JSON.parse(store.get(STORAGE_KEYS.weekBest) || 'null');
+    return w && w.week === weekKey() && Number.isFinite(w.score) ? w.score : 0;
+  } catch { return 0; }
+}
+
+// 没传上去的最好成绩（网络不通时暂存，联网后补传）；上周存下的不再补传，免得算进这周
 function pendingRun() {
   try {
     const r = JSON.parse(store.get(STORAGE_KEYS.pendingRun) || 'null');
-    return r && Number.isFinite(r.score) && r.score > uploadedBest() ? r : null;
+    return r && Number.isFinite(r.score) && r.week === weekKey() && r.score > weekBest() ? r : null;
   } catch { return null; }
 }
 function savePending(run) {
   const old = pendingRun();
-  if (!old || run.score > old.score) store.set(STORAGE_KEYS.pendingRun, JSON.stringify(run));
+  if (!old || run.score > old.score) store.set(STORAGE_KEYS.pendingRun, JSON.stringify({ ...run, week: weekKey() }));
 }
 const clearPending = () => store.set(STORAGE_KEYS.pendingRun, 'null');
 
@@ -1300,7 +1351,8 @@ const clearPending = () => store.set(STORAGE_KEYS.pendingRun, 'null');
 async function uploadRun(run) {
   const rank = await submitScore(run);
   if (rank !== null) {
-    store.set(STORAGE_KEYS.uploadedBest, String(run.score));
+    store.set(STORAGE_KEYS.uploadedBest, String(Math.max(uploadedBest(), run.score)));
+    store.set(STORAGE_KEYS.weekBest, JSON.stringify({ week: weekKey(), score: run.score }));
     clearPending();
   }
   return rank;
@@ -1315,6 +1367,7 @@ async function flushPending() {
 
 let uploadedThisRound = false;
 let pausedByBoard = false;
+let scope = 'week';  // 'week' 本周榜 | 'all' 总榜
 
 // ---------- 排行榜弹窗 ----------
 function renderList(rows) {
@@ -1336,12 +1389,35 @@ function renderList(rows) {
   }));
 }
 
+function setScope(next) {
+  scope = next;
+  [['tab-week', 'week'], ['tab-all', 'all']].forEach(([id, s]) => {
+    $(id).classList.toggle('on', s === scope);
+    $(id).setAttribute('aria-selected', String(s === scope));
+  });
+  loadRanking();
+}
+
+async function showWeekInfo() {
+  const left = daysLeft();
+  $('rank-info').textContent = `每周一 0 点重新开始，还剩 ${left} 天`;
+  try {
+    const [champ] = await fetchTop({ week: true, weeksAgo: 1, limit: 1 });
+    if (champ && scope === 'week') $('rank-info').textContent = `上周冠军：${champ.name} · ${champ.score} 分
+还剩 ${left} 天重新开始`;
+  } catch { /* 拿不到上周冠军就只显示剩余天数 */ }
+}
+
 async function loadRanking() {
   $('rank-msg').textContent = '加载中…';
+  $('rank-list').replaceChildren();
+  if (scope === 'week') showWeekInfo();
+  else $('rank-info').textContent = '所有时间里每个人的最高分';
   try {
-    const rows = await fetchTop();
+    const rows = await fetchTop({ week: scope === 'week' });
     renderList(rows);
-    $('rank-msg').textContent = rows.length ? '' : '还没有人上榜，玩一局去占第一';
+    $('rank-msg').textContent = rows.length ? ''
+      : scope === 'week' ? '本周还没有人上榜，快去抢第一' : '还没有人上榜，玩一局去占第一';
   } catch (err) {
     $('rank-msg').textContent = err.message + (err.network ? '，可以换个 WiFi 或流量，再点刷新' : '，点刷新重试');
   }
@@ -1352,7 +1428,7 @@ function openBoard() {
   if (pausedByBoard) state.paused = true;
   $('rank').hidden = false;
   renderMeBar($('rank-me'), { size: 30, onChanged: loadRanking });
-  loadRanking();
+  setScope('week');
 }
 
 function closeBoard() {
@@ -1411,11 +1487,12 @@ async function autoUpload(reclaimed = false) {
   // 之前有没传上去的更高分，就先补传那一局
   const pending = pendingRun();
   const toSend = pending && pending.score >= run.score ? pending : run;
-  const best = uploadedBest();
-  if (toSend.score <= 0 || toSend.score <= best) {
-    setMsg(best > 0 ? `本局没破纪录，榜上保留你的最高分 ${best}` : '本局 0 分，没有上传');
+  const wb = weekBest();
+  if (toSend.score <= 0 || toSend.score <= wb) {
+    setMsg(wb > 0 ? `本周你最好是 ${wb} 分，这局没超过` : '本局 0 分，没有上传');
     return;
   }
+  const isRecord = toSend.score > uploadedBest();
   uploadedThisRound = true;
   setMsg('正在上榜…');
   try {
@@ -1433,7 +1510,10 @@ async function autoUpload(reclaimed = false) {
       setMsg(`「${oldName}」在你离线时被别人用了，换一个昵称`);
       return;
     }
-    setMsg(toSend === run ? `已自动上榜，全班第 ${rank} 名` : `已补传之前的最高分 ${toSend.score}，全班第 ${rank} 名`);
+    const wr = await myWeekRank().catch(() => null);
+    const ranks = (wr ? `本周第 ${wr} 名，` : '') + `总榜第 ${rank} 名`;
+    setMsg(toSend !== run ? `已补传之前的 ${toSend.score} 分：${ranks}`
+      : isRecord ? `新纪录！${ranks}` : `已上榜：${ranks}`);
   } catch (err) {
     uploadedThisRound = false;
     if (err.network) {
@@ -1470,6 +1550,7 @@ async function saveName() {
       setMsg(`昵称已改成「${name}」，之前的成绩也跟着改名`);
     } else {
       store.set(STORAGE_KEYS.uploadedBest, '0');
+      store.set(STORAGE_KEYS.weekBest, 'null');
       autoUpload();
     }
   } catch (err) {
@@ -1500,6 +1581,8 @@ function bindRankboard() {
   $('btn-rank').addEventListener('click', openBoard);
   $('btn-rank-close').addEventListener('click', closeBoard);
   $('btn-rank-refresh').addEventListener('click', loadRanking);
+  $('tab-week').addEventListener('click', () => setScope('week'));
+  $('tab-all').addEventListener('click', () => setScope('all'));
   $('btn-upload').addEventListener('click', saveName);
   $('player-name').addEventListener('keydown', e => { if (e.key === 'Enter') saveName(); });
   $('btn-rename').addEventListener('click', () => showNameForm(playerName(), '保存'));
@@ -2313,6 +2396,7 @@ function enterGame(name) {
   store.set(STORAGE_KEYS.playerName, name);
   if (pendingAvatar) uploadAvatar(pendingAvatar).catch(() => { /* 头像已存本机，下次再传 */ });
   store.set(STORAGE_KEYS.uploadedBest, '0');
+  store.set(STORAGE_KEYS.weekBest, 'null');
   $('welcome').hidden = true;
   state.paused = false;
 }
@@ -2365,6 +2449,16 @@ function bindWelcome() {
 // ---- announcements.js ----
 // 更新公告：最新的放最前面。每次更新加一条，id 不能重复（打开游戏时，没看过最新一条的玩家会自动弹出）。
 const ANNOUNCEMENTS = [
+  {
+    id: '2026-10-03-weekly',
+    date: '10 月 3 日',
+    title: '周榜上线',
+    items: [
+      '排行榜分成“本周”和“总榜”：本周榜每周一 0 点重新开始，每个人每周都有机会拿第一',
+      '本周榜上会显示上周冠军',
+      '这周只要打出比自己本周更好的成绩就会上榜，不用非得破历史纪录；总榜照旧保留所有人的最高分'
+    ]
+  },
   {
     id: '2026-10-03-guestbook',
     date: '10 月 3 日',

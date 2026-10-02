@@ -1,16 +1,16 @@
 // 游戏本体：物理世界、投放、合成、判负、主循环、画面适配和输入。
-import { LEVELS, MAX, FIELD, PHYSICS, RULES, COLORS } from './config.js?v=19e16d6c';
-import { skin, shapeFor, halfWidth } from './skin.js?v=db8d0fbb';
+import { LEVELS, MAX, FIELD, PHYSICS, RULES, COLORS } from './config.js?v=70a9d4eb';
+import { skin, shapeFor, halfWidth } from './skin.js?v=b3832cb8';
 import { popScale } from './geometry.js?v=6bdd869a';
-import { spawnWeights, pickLevel } from './spawn.js?v=83e2cad0';
-import { rollShiny, shinyMultiplier } from './variant.js?v=949ebd58';
-import { recordShiny } from './dex.js?v=78ee1560';
-import { drawKai } from './draw.js?v=978779ce';
-import { sfx, unlockAudio } from './audio.js?v=fcec154b';
-import { state, resetRound, addScore } from './state.js?v=a3d7fb92';
-import { resetEffects, mergeEffects, shinyEffects, applyShake, drawEffects } from './effects.js?v=4888eee3';
-import { showWin, gameOver } from './report.js?v=3703e5f7';
-import { writeSave, clearSave } from './save.js?v=77a1c0bb';
+import { spawnWeights, pickLevel } from './spawn.js?v=15113cad';
+import { rollShiny, shinyMultiplier } from './variant.js?v=12c3d6ee';
+import { recordShiny } from './dex.js?v=68b76d29';
+import { drawKai } from './draw.js?v=4b65a157';
+import { sfx, unlockAudio } from './audio.js?v=796a23db';
+import { state, resetRound, addScore } from './state.js?v=123f223b';
+import { resetEffects, mergeEffects, shinyEffects, applyShake, drawEffects } from './effects.js?v=df4c26e3';
+import { showWin, gameOver } from './report.js?v=fb6f0e7e';
+import { writeSave, clearSave } from './save.js?v=36204485';
 
 const { Engine, Bodies, Composite, Events, Body } = Matter;
 const W = FIELD.width, H = FIELD.height;

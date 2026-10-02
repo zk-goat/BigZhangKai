@@ -1,6 +1,6 @@
 // 皮肤：每一级的名字、照片和碰撞轮廓。照片统一用 config.js 里的内置照片，玩家不能自己换。
-import { LEVELS, RULES, STORAGE_KEYS } from './config.js?v=19e16d6c';
-import { traceImage, loadImage } from './trace.js?v=5b38dbae';
+import { LEVELS, RULES, STORAGE_KEYS } from './config.js?v=70a9d4eb';
+import { traceImage, loadImage } from './trace.js?v=f73bf07e';
 
 export const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },

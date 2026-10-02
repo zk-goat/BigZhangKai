@@ -1,6 +1,6 @@
 // 合成反馈：光圈、碎片、飘字、震屏、连击提示。只负责“看起来爽”，不影响玩法。
-import { LEVELS, FIELD, COLORS } from './config.js?v=19e16d6c';
-import { skin } from './skin.js?v=db8d0fbb';
+import { LEVELS, FIELD, COLORS } from './config.js?v=70a9d4eb';
+import { skin } from './skin.js?v=b3832cb8';
 import { starPath } from './shine.js?v=8bbb7766';
 
 const SHAKE_FROM_LEVEL = 7;     // 合到这一级及以上才震屏

@@ -1,6 +1,6 @@
 // 音效：WebAudio 现场合成，不需要音频文件。浏览器要求先有一次点击才会出声。
-import { STORAGE_KEYS } from './config.js?v=19e16d6c';
-import { store } from './skin.js?v=db8d0fbb';
+import { STORAGE_KEYS } from './config.js?v=70a9d4eb';
+import { store } from './skin.js?v=b3832cb8';
 
 let audioCtx = null;
 let muted = store.get(STORAGE_KEYS.muted) === '1';
