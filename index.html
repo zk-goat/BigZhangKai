@@ -79,10 +79,16 @@
       <ol id="board"></ol>
     </div>
       <div class="upload" id="upload" hidden>
-        <label for="player-name">上传到全班排行榜</label>
-        <div class="upload-row">
-          <input id="player-name" type="text" maxlength="12" placeholder="你的昵称" autocomplete="nickname">
-          <button id="btn-upload" type="button">上传</button>
+        <div id="upload-ask">
+          <label for="player-name">填个昵称，以后每局自动上榜</label>
+          <div class="upload-row">
+            <input id="player-name" type="text" maxlength="12" placeholder="你的昵称" autocomplete="nickname">
+            <button id="btn-upload" type="button">保存并上榜</button>
+          </div>
+        </div>
+        <div class="upload-auto" id="upload-auto" hidden>
+          <span>全班排行榜 · 昵称 <b id="player-label"></b></span>
+          <button class="linkish" id="btn-rename" type="button">改昵称</button>
         </div>
         <p class="upload-msg" id="upload-msg" role="status"></p>
         <button class="linkish" id="btn-upload-board" type="button">看全班排行榜</button>

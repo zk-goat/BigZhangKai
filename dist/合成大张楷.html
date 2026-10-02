@@ -169,6 +169,10 @@ canvas {
 .rank-list li.mine .who b::after { content: '（我）'; color: var(--accent); font-weight: 400; }
 .rank-msg { font-size: .85rem; color: var(--muted); text-align: center; min-height: 1.2em; }
 #rank { z-index: 6; }
+.upload-auto { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: .85rem; color: var(--muted); }
+.upload-auto b { color: var(--ink); }
+.upload-msg .linkish { color: var(--accent); font-size: inherit; }
+#upload-ask { display: grid; gap: 6px; }
 </style>
 </head>
 <body>
@@ -244,10 +248,16 @@ canvas {
       <ol id="board"></ol>
     </div>
       <div class="upload" id="upload" hidden>
-        <label for="player-name">上传到全班排行榜</label>
-        <div class="upload-row">
-          <input id="player-name" type="text" maxlength="12" placeholder="你的昵称" autocomplete="nickname">
-          <button id="btn-upload" type="button">上传</button>
+        <div id="upload-ask">
+          <label for="player-name">填个昵称，以后每局自动上榜</label>
+          <div class="upload-row">
+            <input id="player-name" type="text" maxlength="12" placeholder="你的昵称" autocomplete="nickname">
+            <button id="btn-upload" type="button">保存并上榜</button>
+          </div>
+        </div>
+        <div class="upload-auto" id="upload-auto" hidden>
+          <span>全班排行榜 · 昵称 <b id="player-label"></b></span>
+          <button class="linkish" id="btn-rename" type="button">改昵称</button>
         </div>
         <p class="upload-msg" id="upload-msg" role="status"></p>
         <button class="linkish" id="btn-upload-board" type="button">看全班排行榜</button>
@@ -348,7 +358,8 @@ const STORAGE_KEYS = {
   board: 'dazhangkai-board-v1',
   muted: 'dazhangkai-muted',
   playerName: 'dazhangkai-name',
-  myScores: 'dazhangkai-my-scores'
+  myScores: 'dazhangkai-my-scores',
+  uploadedBest: 'dazhangkai-uploaded-best'
 };
 
 const SHARE_URL = 'zk-goat.github.io/BigZhangKai';
@@ -753,10 +764,13 @@ function cleanName(raw) {
   return [...String(raw || '').replace(/[\u0000-\u001f\u007f]/g, '').trim()].slice(0, LEADERBOARD.nameMaxLen).join('');
 }
 
+// 前 N 名，每个昵称只保留最高的一条（多取一些再在本地去重）
 async function fetchTop() {
-  const q = `${LEADERBOARD.table}?select=id,name,score,top_level,created_at&order=score.desc,created_at.asc&limit=${LEADERBOARD.size}`;
+  const q = `${LEADERBOARD.table}?select=id,name,score,top_level,created_at&order=score.desc,created_at.asc&limit=${LEADERBOARD.size * 5}`;
   const rows = await (await request(q)).json();
-  return Array.isArray(rows) ? rows : [];
+  if (!Array.isArray(rows)) return [];
+  const seen = new Set();
+  return rows.filter(r => !seen.has(r.name) && seen.add(r.name)).slice(0, LEADERBOARD.size);
 }
 
 // 提交一局成绩，返回新纪录的 id
@@ -774,15 +788,16 @@ async function submitScore({ name, score, topLevel, merges, durationS }) {
   return saved && saved.id;
 }
 
-// 分数比 score 高的有几条 → 名次 = 条数 + 1
+// 名次 = 最高分比 score 高的昵称数 + 1（与榜单去重口径一致）
 async function rankOf(score) {
-  const res = await request(`${LEADERBOARD.table}?select=id&score=gt.${Math.round(score)}&limit=1`, { prefer: 'count=exact' });
-  const total = Number((res.headers.get('content-range') || '').split('/')[1]);
-  return Number.isFinite(total) ? total + 1 : null;
+  const q = `${LEADERBOARD.table}?select=name&score=gt.${Math.round(score)}&order=score.desc&limit=1000`;
+  const rows = await (await request(q)).json();
+  return Array.isArray(rows) ? new Set(rows.map(r => r.name)).size + 1 : null;
 }
 
 // ---- rankboard.js ----
-// 排行榜界面：顶栏“排行榜”弹窗 + 战报卡上的“上传成绩”。
+// 排行榜界面：顶栏“排行榜”弹窗 + 战报卡上的自动上榜。
+// 第一次结束时填一次昵称，以后每局结束自动上传；只有破了自己的纪录才传，榜上每人只显示最高分。
 
 
 
@@ -792,10 +807,13 @@ const myIds = () => {
   try { return new Set(JSON.parse(store.get(STORAGE_KEYS.myScores) || '[]')); } catch { return new Set(); }
 };
 const rememberId = id => store.set(STORAGE_KEYS.myScores, JSON.stringify([...myIds(), id].slice(-50)));
+const playerName = () => store.get(STORAGE_KEYS.playerName) || '';
+const uploadedBest = () => Number(store.get(STORAGE_KEYS.uploadedBest)) || 0;
 
 let uploadedThisRound = false;
 let pausedByBoard = false;
 
+// ---------- 排行榜弹窗 ----------
 function renderList(rows) {
   const mine = myIds();
   $('rank-list').replaceChildren(...rows.map((r, i) => {
@@ -839,37 +857,75 @@ function closeBoard() {
   pausedByBoard = false;
 }
 
-// 每局结束时调用：重置上传区
-function prepareUpload() {
-  uploadedThisRound = false;
-  $('upload').hidden = !leaderboardEnabled();
-  $('player-name').value = store.get(STORAGE_KEYS.playerName) || '';
+// ---------- 战报卡上的上榜区 ----------
+function showNameForm(prefill, buttonText) {
+  $('upload-ask').hidden = false;
+  $('upload-auto').hidden = true;
+  $('player-name').value = prefill;
+  $('btn-upload').textContent = buttonText;
   $('btn-upload').disabled = false;
-  $('btn-upload').textContent = '上传';
-  $('upload-msg').textContent = '';
 }
 
-async function upload() {
-  if (uploadedThisRound) return;
-  const name = cleanName($('player-name').value);
-  if (!name) { $('upload-msg').textContent = '先填一个昵称'; $('player-name').focus(); return; }
-  store.set(STORAGE_KEYS.playerName, name);
-  $('btn-upload').disabled = true;
-  $('btn-upload').textContent = '上传中…';
+function showNameLine(name) {
+  $('upload-ask').hidden = true;
+  $('upload-auto').hidden = false;
+  $('player-label').textContent = name;
+}
+
+async function autoUpload() {
+  const name = playerName();
+  if (!name || uploadedThisRound) return;
+  const best = uploadedBest();
+  if (state.score <= 0 || state.score <= best) {
+    $('upload-msg').textContent = best > 0 ? `本局没破纪录，榜上保留你的最高分 ${best}` : '本局 0 分，没有上传';
+    return;
+  }
+  uploadedThisRound = true;
+  $('upload-msg').textContent = '正在上榜…';
   try {
     const id = await submitScore({
       name, score: state.score, topLevel: state.topLevel, merges: state.mergeCount,
       durationS: (Date.now() - state.startedAt) / 1000
     });
-    uploadedThisRound = true;
     if (id) rememberId(id);
-    $('btn-upload').textContent = '已上传';
+    store.set(STORAGE_KEYS.uploadedBest, String(state.score));
     const rank = await rankOf(state.score).catch(() => null);
-    $('upload-msg').textContent = rank ? `已上榜，全班第 ${rank} 名` : '已上榜';
+    $('upload-msg').textContent = rank ? `已自动上榜，全班第 ${rank} 名` : '已自动上榜';
   } catch (err) {
-    $('btn-upload').disabled = false;
-    $('btn-upload').textContent = '重试';
-    $('upload-msg').textContent = err.message;
+    uploadedThisRound = false;
+    $('upload-msg').textContent = err.message + '，';
+    const retry = document.createElement('button');
+    retry.className = 'linkish'; retry.type = 'button'; retry.textContent = '点这里重试';
+    retry.addEventListener('click', autoUpload);
+    $('upload-msg').append(retry);
+  }
+}
+
+function saveName() {
+  const name = cleanName($('player-name').value);
+  if (!name) { $('upload-msg').textContent = '先填一个昵称'; $('player-name').focus(); return; }
+  // 换了昵称就从头记最高分，这局成绩用新昵称上榜
+  if (name !== playerName()) {
+    store.set(STORAGE_KEYS.uploadedBest, '0');
+    uploadedThisRound = false;
+  }
+  store.set(STORAGE_KEYS.playerName, name);
+  showNameLine(name);
+  autoUpload();
+}
+
+// 每局结束时调用
+function onRoundOver() {
+  uploadedThisRound = false;
+  $('upload').hidden = !leaderboardEnabled();
+  if (!leaderboardEnabled()) return;
+  $('upload-msg').textContent = '';
+  const name = playerName();
+  if (name) {
+    showNameLine(name);
+    autoUpload();
+  } else {
+    showNameForm('', '保存并上榜');
   }
 }
 
@@ -878,8 +934,9 @@ function bindRankboard() {
   $('btn-rank').addEventListener('click', openBoard);
   $('btn-rank-close').addEventListener('click', closeBoard);
   $('btn-rank-refresh').addEventListener('click', loadRanking);
-  $('btn-upload').addEventListener('click', upload);
-  $('player-name').addEventListener('keydown', e => { if (e.key === 'Enter') upload(); });
+  $('btn-upload').addEventListener('click', saveName);
+  $('player-name').addEventListener('keydown', e => { if (e.key === 'Enter') saveName(); });
+  $('btn-rename').addEventListener('click', () => showNameForm(playerName(), '保存'));
   $('btn-upload-board').addEventListener('click', openBoard);
 }
 
@@ -984,7 +1041,7 @@ function gameOver() {
   $('stat-time').textContent = Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
   $('report-foot').textContent = '截图发群里 · ' + SHARE_URL;
   renderBoard(board, run);
-  prepareUpload();
+  onRoundOver();
 
   shareText = `我在「合成大张楷」拿了 ${score} 分，最高合成到第 ${topLevel + 1} 级「${name}」，称号：${title}`
     + (isRecord ? '，刷新了我的最高纪录' : '')
@@ -1405,7 +1462,7 @@ function bindSettings({ onRename, onChanged }) {
 }
 
 // ---- main.js ----
-// 启动：加载照片 → 开局 → 绑定按钮。链接带 ?test=win / ?test=over 时直接展示庆祝画面 / 示例战报。
+// 启动：加载照片 → 开局 → 绑定按钮。链接带 ?test=win / ?test=over（可加 &score=分数）时直接展示庆祝画面 / 示例战报。
 
 
 
@@ -1440,7 +1497,8 @@ function runTestHooks() {
   }
   if (/[?&]test=over/.test(q)) {
     setTimeout(() => {
-      Object.assign(state, { topLevel: 8, score: 1234, mergeCount: 57, maxCombo: 4, startedAt: Date.now() - 263000 });
+      const score = Number((q.match(/[?&]score=(\d+)/) || [])[1]) || 1234;
+      Object.assign(state, { topLevel: 8, score, mergeCount: 57, maxCombo: 4, startedAt: Date.now() - 263000 });
       gameOver();
     }, 800);
   }

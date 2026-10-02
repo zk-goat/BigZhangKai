@@ -1,4 +1,4 @@
-// 启动：加载照片 → 开局 → 绑定按钮。链接带 ?test=win / ?test=over 时直接展示庆祝画面 / 示例战报。
+// 启动：加载照片 → 开局 → 绑定按钮。链接带 ?test=win / ?test=over（可加 &score=分数）时直接展示庆祝画面 / 示例战报。
 import { FIELD, MAX } from './config.js';
 import { initSkin } from './skin.js';
 import { isMuted, toggleMuted } from './audio.js';
@@ -34,7 +34,8 @@ function runTestHooks() {
   }
   if (/[?&]test=over/.test(q)) {
     setTimeout(() => {
-      Object.assign(state, { topLevel: 8, score: 1234, mergeCount: 57, maxCombo: 4, startedAt: Date.now() - 263000 });
+      const score = Number((q.match(/[?&]score=(\d+)/) || [])[1]) || 1234;
+      Object.assign(state, { topLevel: 8, score, mergeCount: 57, maxCombo: 4, startedAt: Date.now() - 263000 });
       gameOver();
     }, 800);
   }

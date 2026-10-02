@@ -162,3 +162,7 @@ canvas {
 .rank-list li.mine .who b::after { content: '（我）'; color: var(--accent); font-weight: 400; }
 .rank-msg { font-size: .85rem; color: var(--muted); text-align: center; min-height: 1.2em; }
 #rank { z-index: 6; }
+.upload-auto { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: .85rem; color: var(--muted); }
+.upload-auto b { color: var(--ink); }
+.upload-msg .linkish { color: var(--accent); font-size: inherit; }
+#upload-ask { display: grid; gap: 6px; }

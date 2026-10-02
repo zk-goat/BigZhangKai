@@ -35,10 +35,13 @@ export function cleanName(raw) {
   return [...String(raw || '').replace(/[\u0000-\u001f\u007f]/g, '').trim()].slice(0, LEADERBOARD.nameMaxLen).join('');
 }
 
+// 前 N 名，每个昵称只保留最高的一条（多取一些再在本地去重）
 export async function fetchTop() {
-  const q = `${LEADERBOARD.table}?select=id,name,score,top_level,created_at&order=score.desc,created_at.asc&limit=${LEADERBOARD.size}`;
+  const q = `${LEADERBOARD.table}?select=id,name,score,top_level,created_at&order=score.desc,created_at.asc&limit=${LEADERBOARD.size * 5}`;
   const rows = await (await request(q)).json();
-  return Array.isArray(rows) ? rows : [];
+  if (!Array.isArray(rows)) return [];
+  const seen = new Set();
+  return rows.filter(r => !seen.has(r.name) && seen.add(r.name)).slice(0, LEADERBOARD.size);
 }
 
 // 提交一局成绩，返回新纪录的 id
@@ -56,9 +59,9 @@ export async function submitScore({ name, score, topLevel, merges, durationS }) 
   return saved && saved.id;
 }
 
-// 分数比 score 高的有几条 → 名次 = 条数 + 1
+// 名次 = 最高分比 score 高的昵称数 + 1（与榜单去重口径一致）
 export async function rankOf(score) {
-  const res = await request(`${LEADERBOARD.table}?select=id&score=gt.${Math.round(score)}&limit=1`, { prefer: 'count=exact' });
-  const total = Number((res.headers.get('content-range') || '').split('/')[1]);
-  return Number.isFinite(total) ? total + 1 : null;
+  const q = `${LEADERBOARD.table}?select=name&score=gt.${Math.round(score)}&order=score.desc&limit=1000`;
+  const rows = await (await request(q)).json();
+  return Array.isArray(rows) ? new Set(rows.map(r => r.name)).size + 1 : null;
 }

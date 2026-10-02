@@ -73,7 +73,8 @@ export const STORAGE_KEYS = {
   board: 'dazhangkai-board-v1',
   muted: 'dazhangkai-muted',
   playerName: 'dazhangkai-name',
-  myScores: 'dazhangkai-my-scores'
+  myScores: 'dazhangkai-my-scores',
+  uploadedBest: 'dazhangkai-uploaded-best'
 };
 
 export const SHARE_URL = 'zk-goat.github.io/BigZhangKai';

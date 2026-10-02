@@ -4,7 +4,7 @@ import { skin, store } from './skin.js';
 import { paintLevel } from './draw.js';
 import { sfx } from './audio.js';
 import { state } from './state.js';
-import { prepareUpload } from './rankboard.js';
+import { onRoundOver } from './rankboard.js';
 import { $ } from './dom.js';
 
 const BOARD_SIZE = 5;
@@ -99,7 +99,7 @@ export function gameOver() {
   $('stat-time').textContent = Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
   $('report-foot').textContent = '截图发群里 · ' + SHARE_URL;
   renderBoard(board, run);
-  prepareUpload();
+  onRoundOver();
 
   shareText = `我在「合成大张楷」拿了 ${score} 分，最高合成到第 ${topLevel + 1} 级「${name}」，称号：${title}`
     + (isRecord ? '，刷新了我的最高纪录' : '')
