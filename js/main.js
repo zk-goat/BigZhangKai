@@ -8,6 +8,7 @@ import { startGame, restoreGame, loop, fit, bindInput, makeKai, updateHud, debug
 import { readSave } from './save.js';
 import { bindSettings } from './settings.js';
 import { bindRankboard, flushPending } from './rankboard.js';
+import { bindWelcome, showWelcomeIfNeeded } from './welcome.js';
 import { $ } from './dom.js';
 
 function renderSoundBtn() {
@@ -35,6 +36,7 @@ function bindButtons() {
   $('btn-sound').addEventListener('click', () => { toggleMuted(); renderSoundBtn(); });
   bindSettings({ onRename: updateHud, onChanged: startGame });
   bindRankboard();
+  bindWelcome();
   renderSoundBtn();
 }
 
@@ -67,6 +69,7 @@ async function boot() {
   } else {
     startGame();
   }
+  if (!/[?&]test=/.test(location.search)) showWelcomeIfNeeded();
   requestAnimationFrame(loop);
   runTestHooks();
   flushPending();

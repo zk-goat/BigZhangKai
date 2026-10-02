@@ -175,3 +175,22 @@ canvas {
   font-size: .85rem; box-shadow: 0 4px 14px rgba(59,42,20,.3);
 }
 .toast button { font-size: .8rem; padding: 2px 10px; background: var(--panel); color: var(--ink); border-color: var(--panel); }
+
+/* 欢迎页 */
+.welcome { z-index: 7; background: var(--bg); }
+.welcome-card { align-items: center; text-align: center; gap: 12px; border: 0; background: transparent; }
+.welcome-card canvas { width: 160px; height: 160px; border: 0; background: transparent; }
+.welcome-card h2 { font-size: 2.2rem; letter-spacing: .06em; }
+.welcome-card p { max-width: 22em; }
+.welcome-card input {
+  width: 100%; max-width: 280px; box-sizing: border-box; font: inherit; font-size: 1.05rem; text-align: center;
+  padding: 10px 14px; border: 3px solid var(--ink); border-radius: 999px; background: #fff; color: var(--ink);
+}
+.welcome-card input:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.welcome-card button {
+  font-family: var(--display); font-size: 1.3rem; padding: 8px 40px;
+  background: var(--accent); color: #fff; border-color: var(--ink);
+}
+.welcome-card button:disabled { opacity: .7; }
+.welcome-msg { min-height: 1.4em; color: var(--accent) !important; font-weight: 700; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }

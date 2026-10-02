@@ -1,0 +1,61 @@
+// 欢迎页：第一次打开时输入昵称（全班唯一）。已经有昵称的老玩家直接进游戏。
+// 连不上排行榜时也放行：昵称先存在本机，等下次上榜时再向服务器确认。
+import { STORAGE_KEYS, MAX } from './config.js';
+import { store } from './skin.js';
+import { paintLevel } from './draw.js';
+import { state } from './state.js';
+import { $ } from './dom.js';
+import { leaderboardEnabled, claimName, cleanName, canPersist } from './leaderboard.js';
+
+export const needsWelcome = () => leaderboardEnabled() && !store.get(STORAGE_KEYS.playerName);
+
+let entering = false;
+
+function enterGame(name) {
+  store.set(STORAGE_KEYS.playerName, name);
+  store.set(STORAGE_KEYS.uploadedBest, '0');
+  $('welcome').hidden = true;
+  state.paused = false;
+}
+
+async function submitName() {
+  if (entering) return;
+  const name = cleanName($('welcome-name').value);
+  const msg = $('welcome-msg');
+  if (!name) { msg.textContent = '先起个昵称'; $('welcome-name').focus(); return; }
+  if (!canPersist()) { msg.textContent = '这个浏览器不能保存数据（可能是无痕模式），换个浏览器打开吧'; return; }
+  entering = true;
+  $('btn-welcome').disabled = true;
+  msg.textContent = '检查昵称有没有人用…';
+  try {
+    if (await claimName(name)) {
+      enterGame(name);
+    } else {
+      msg.textContent = `「${name}」已经被别人用了，换一个`;
+      $('welcome-name').select();
+    }
+  } catch (err) {
+    if (err.network) {
+      enterGame(name);  // 先进去玩，昵称等联网后再确认
+    } else {
+      msg.textContent = err.message;
+    }
+  } finally {
+    entering = false;
+    $('btn-welcome').disabled = false;
+  }
+}
+
+// 需要的话显示欢迎页，并在它关掉之前暂停游戏
+export function showWelcomeIfNeeded() {
+  if (!needsWelcome()) return;
+  state.paused = true;
+  paintLevel($('welcome-pic'), MAX);
+  $('welcome').hidden = false;
+  $('welcome-name').focus();
+}
+
+export function bindWelcome() {
+  $('btn-welcome').addEventListener('click', submitName);
+  $('welcome-name').addEventListener('keydown', e => { if (e.key === 'Enter') submitName(); });
+}

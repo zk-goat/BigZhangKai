@@ -110,7 +110,7 @@ function showRetry(message) {
   $('upload-msg').append(retry);
 }
 
-async function autoUpload() {
+async function autoUpload(reclaimed = false) {
   if (!playerName() || uploadedThisRound) return;
   // 先把本局数据拷出来：上传途中玩家可能已经点了“再来一局”
   const run = {
@@ -130,12 +130,16 @@ async function autoUpload() {
   try {
     const rank = await uploadRun(toSend);
     if (rank === null) {
-      // 服务器不认识这台设备（换了浏览器/数据被清）：重新占一次昵称
+      // 服务器不认识这台设备（断网时先进的游戏 / 换了浏览器）：自动用本机昵称占一次，成功就重传
       const oldName = playerName();
+      if (!reclaimed && oldName && await claimName(oldName).catch(() => false)) {
+        uploadedThisRound = false;
+        return autoUpload(true);
+      }
       uploadedThisRound = false;
       store.set(STORAGE_KEYS.playerName, '');
       showNameForm(oldName, '保存并上榜');
-      setMsg('需要重新确认一下昵称');
+      setMsg(`「${oldName}」在你离线时被别人用了，换一个昵称`);
       return;
     }
     setMsg(toSend === run ? `已自动上榜，全班第 ${rank} 名` : `已补传之前的最高分 ${toSend.score}，全班第 ${rank} 名`);

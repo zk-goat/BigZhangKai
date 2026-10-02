@@ -46,6 +46,18 @@
   </div>
 </div>
 
+<div class="overlay welcome" id="welcome" hidden>
+  <div class="card welcome-card">
+    <canvas id="welcome-pic" width="320" height="320" aria-hidden="true"></canvas>
+    <h2>合成大张楷</h2>
+    <p>从推眼镜楷一路合成到捧金球的大张楷。起个昵称，成绩会自动进全班排行榜。</p>
+    <label class="sr-only" for="welcome-name">昵称</label>
+    <input id="welcome-name" type="text" maxlength="12" placeholder="你的昵称（最多 12 个字）" autocomplete="nickname">
+    <button id="btn-welcome" type="button">开始玩</button>
+    <p class="welcome-msg" id="welcome-msg" role="status"></p>
+  </div>
+</div>
+
 <div class="overlay" id="rank" hidden>
   <div class="card rank-card">
     <h2>全班排行榜</h2>
