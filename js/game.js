@@ -102,7 +102,8 @@ function clampAim(lv) {
 }
 
 export function drop() {
-  if (!state.engine || !state.canDrop || state.over || state.paused || !document.getElementById('settings').hidden) return;
+  const overlayOpen = document.querySelector('.overlay:not([hidden])');
+  if (!state.engine || !state.canDrop || state.over || state.paused || overlayOpen) return;
   makeKai(clampAim(state.current), FIELD.dropY, state.current);
   sfx.drop();
   state.current = state.next;

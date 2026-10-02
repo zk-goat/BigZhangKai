@@ -13,6 +13,7 @@
     <button id="btn-set" type="button">换头像</button>
     <button id="btn-restart" type="button">重开</button>
     <button id="btn-sound" type="button" aria-pressed="true">静音</button>
+    <button id="btn-rank" type="button" hidden>排行榜</button>
   </div>
   <div class="score"><span id="score">0</span><small>最高 <span id="best">0</span></small></div>
 </div>
@@ -41,6 +42,18 @@
   </div>
 </div>
 
+<div class="overlay" id="rank" hidden>
+  <div class="card rank-card">
+    <h2>全班排行榜</h2>
+    <ol class="rank-list" id="rank-list"></ol>
+    <p class="rank-msg" id="rank-msg" role="status"></p>
+    <div class="actions">
+      <button id="btn-rank-refresh" type="button">刷新</button>
+      <button id="btn-rank-close" type="button">关闭</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="over" hidden>
   <div class="card report">
     <div class="report-head"><b>合成大张楷 · 战报</b><span id="report-date">10月2日</span></div>
@@ -65,6 +78,15 @@
       <h3>本机最好 5 局</h3>
       <ol id="board"></ol>
     </div>
+      <div class="upload" id="upload" hidden>
+        <label for="player-name">上传到全班排行榜</label>
+        <div class="upload-row">
+          <input id="player-name" type="text" maxlength="12" placeholder="你的昵称" autocomplete="nickname">
+          <button id="btn-upload" type="button">上传</button>
+        </div>
+        <p class="upload-msg" id="upload-msg" role="status"></p>
+        <button class="linkish" id="btn-upload-board" type="button">看全班排行榜</button>
+      </div>
       <textarea id="copy-fallback" rows="3" readonly hidden aria-label="战绩文字"></textarea>
       <div class="actions" style="justify-content:center">
         <button id="btn-copy" type="button">复制战绩</button>

@@ -71,7 +71,19 @@ export const STORAGE_KEYS = {
   skin: 'dazhangkai-skin-v5',
   best: 'dazhangkai-best-v1',
   board: 'dazhangkai-board-v1',
-  muted: 'dazhangkai-muted'
+  muted: 'dazhangkai-muted',
+  playerName: 'dazhangkai-name',
+  myScores: 'dazhangkai-my-scores'
 };
 
 export const SHARE_URL = 'zk-goat.github.io/BigZhangKai';
+
+// 全班排行榜（Supabase）。url 留空时排行榜按钮自动隐藏。
+// key 用的是 publishable 公开密钥，本来就是给网页用的；数据库只允许新增和查看，不能改删。
+export const LEADERBOARD = {
+  url: '',
+  key: 'sb_publishable_FycZaZjEgmW-6KTKw5Gplw_cG_FZt47',
+  table: 'scores',
+  size: 20,          // 显示前几名
+  nameMaxLen: 12     // 与数据库里的长度限制一致
+};

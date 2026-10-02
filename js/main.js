@@ -6,6 +6,7 @@ import { state } from './state.js';
 import { copyShare, gameOver } from './report.js';
 import { startGame, loop, fit, bindInput, makeKai, updateHud } from './game.js';
 import { bindSettings } from './settings.js';
+import { bindRankboard } from './rankboard.js';
 import { $ } from './dom.js';
 
 function renderSoundBtn() {
@@ -21,6 +22,7 @@ function bindButtons() {
   $('btn-continue').addEventListener('click', () => { $('win').hidden = true; state.paused = false; });
   $('btn-sound').addEventListener('click', () => { toggleMuted(); renderSoundBtn(); });
   bindSettings({ onRename: updateHud, onChanged: startGame });
+  bindRankboard();
   renderSoundBtn();
 }
 

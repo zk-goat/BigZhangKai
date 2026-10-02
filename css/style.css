@@ -128,3 +128,37 @@ canvas {
 @media (prefers-reduced-motion: reduce) { .hero, .hero canvas { animation: none; } }
 #copy-fallback { width: 100%; box-sizing: border-box; font: inherit; font-size: .8rem; padding: 6px; border: 2px solid var(--line); border-radius: 8px; resize: none; background: #fff; color: var(--ink); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* 排行榜 */
+.upload { width: 100%; display: grid; gap: 6px; padding: 10px 12px; border: 2px dashed var(--accent); border-radius: 12px; text-align: left; }
+.upload label { font-family: var(--display); font-size: 1rem; color: var(--ink); }
+.upload-row { display: flex; gap: 6px; }
+.upload-row input {
+  flex: 1; min-width: 0; box-sizing: border-box; font: inherit; font-size: .95rem;
+  padding: 5px 10px; border: 2px solid var(--line); border-radius: 999px; background: #fff; color: var(--ink);
+}
+.upload-row input:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+.upload-row button { background: var(--accent); color: #fff; border-color: var(--accent); }
+.upload-row button:disabled { opacity: .7; cursor: default; }
+.upload-msg { min-height: 1.2em; font-size: .85rem; color: var(--accent); font-weight: 700; }
+.linkish { justify-self: start; border: 0; background: none; padding: 0; font-size: .8rem; color: var(--muted); text-decoration: underline; }
+.linkish:hover { background: none; color: var(--ink); }
+.rank-card { gap: 10px; }
+.rank-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.rank-list li {
+  display: grid; grid-template-columns: 2em 1fr auto; align-items: center; gap: 8px;
+  padding: 6px 10px; border-radius: 10px; background: rgba(217,180,90,.15);
+}
+.rank-list .no { font-family: var(--display); font-size: 1.1rem; text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rank-list .who { display: grid; min-width: 0; }
+.rank-list .who b { font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rank-list .who small { font-size: .72rem; color: var(--muted); }
+.rank-list .pts { font-family: var(--display); font-size: 1.25rem; color: var(--ink); font-variant-numeric: tabular-nums; }
+.rank-list li.top1 { background: rgba(242,183,5,.35); }
+.rank-list li.top2 { background: rgba(185,185,200,.35); }
+.rank-list li.top3 { background: rgba(205,127,50,.28); }
+.rank-list li.top1 .no, .rank-list li.top2 .no, .rank-list li.top3 .no { color: var(--ink); }
+.rank-list li.mine { outline: 2px solid var(--accent); }
+.rank-list li.mine .who b::after { content: '（我）'; color: var(--accent); font-weight: 400; }
+.rank-msg { font-size: .85rem; color: var(--muted); text-align: center; min-height: 1.2em; }
+#rank { z-index: 6; }
