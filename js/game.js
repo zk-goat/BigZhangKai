@@ -2,6 +2,7 @@
 import { LEVELS, MAX, FIELD, PHYSICS, RULES, COLORS } from './config.js';
 import { skin, shapeFor, halfWidth } from './skin.js';
 import { popScale } from './geometry.js';
+import { spawnWeights, pickLevel } from './spawn.js';
 import { drawKai } from './draw.js';
 import { sfx, unlockAudio } from './audio.js';
 import { state, resetRound, addScore } from './state.js';
@@ -11,6 +12,10 @@ import { writeSave, clearSave } from './save.js';
 
 const { Engine, Bodies, Composite, Events, Body } = Matter;
 const W = FIELD.width, H = FIELD.height;
+
+// 模拟测试时替换时钟、关掉特效音效和界面刷新
+let clock = () => performance.now();
+let silent = false;
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -45,7 +50,7 @@ export function makeKai(x, y, lv) {
   const b = shape
     ? Bodies.fromVertices(x, y, [shape.verts], PHYSICS.body)
     : Bodies.circle(x, y, LEVELS[lv].r, PHYSICS.body);
-  Object.assign(b, { kaiLevel: lv, kaiShaped: !!shape, bornAt: performance.now(), merged: false });
+  Object.assign(b, { kaiLevel: lv, kaiShaped: !!shape, bornAt: clock(), merged: false });
   Composite.add(state.engine.world, b);
   return b;
 }
@@ -72,7 +77,7 @@ function mergeNearby() {
 }
 
 function mergePair(a, b) {
-  const lv = a.kaiLevel + 1, now = performance.now();
+  const lv = a.kaiLevel + 1, now = clock();
   a.merged = b.merged = true;
   const x = (a.position.x + b.position.x) / 2, y = (a.position.y + b.position.y) / 2;
   Composite.remove(state.engine.world, [a, b]);
@@ -85,17 +90,27 @@ function mergePair(a, b) {
   state.mergeCount += 1;
   state.maxCombo = Math.max(state.maxCombo, state.combo);
   state.topLevel = Math.max(state.topLevel, lv);
-  const gain = lv * 2 + (state.combo >= 2 ? (state.combo - 1) * lv : 0) + (lv === MAX ? RULES.winBonus : 0);
+  const base = lv * 2 + (state.combo >= 2 ? (state.combo - 1) * lv : 0);
+  const gain = Math.round(base * RULES.scoreScale) + (lv === MAX ? RULES.winBonus : 0);
   addScore(gain);
+  if (silent) {
+    if (lv === MAX) state.wonThisGame = true;
+    return;
+  }
   mergeEffects({ x, y, lv, gain, combo: state.combo, now });
-
   if (lv === MAX && !state.wonThisGame) showWin();
   else sfx.merge(lv, state.combo);
   updateHud();
 }
 
 // ---------- 投放与判负 ----------
-const randLevel = () => Math.floor(Math.random() * (Math.min(RULES.spawnMaxLevel, Math.max(2, state.topLevel - 1)) + 1));
+function levelCounts() {
+  const counts = new Array(MAX + 1).fill(0);
+  kaiBodies().forEach(b => { if (!b.merged) counts[b.kaiLevel] += 1; });
+  return counts;
+}
+
+const randLevel = (table) => pickLevel(spawnWeights(state.topLevel, levelCounts(), table));
 
 function clampAim(lv) {
   const half = halfWidth(lv);
@@ -122,6 +137,49 @@ function checkDanger(now) {
   if (!risky) { state.dangerSince = 0; return; }
   if (!state.dangerSince) state.dangerSince = now;
   if (now - state.dangerSince > RULES.dangerHoldMs) gameOver();
+}
+
+// ---------- 快速模拟（只在 ?debug 时挂到 window 上，用来调掉落表）----------
+// 不渲染，直接快进物理。策略：大概率对准场上最高处的同级张楷投放，否则随机。
+// 每次投放之间按 thinkMs 推进物理（模拟玩家看一眼再投）。返回每局统计。
+export function simulateGames({ games = 10, table, thinkMs = 1000, aimRate = 0.7, maxDrops = 800, seedRand = Math.random } = {}) {
+  const steps = Math.round(thinkMs / PHYSICS.stepMs);
+  const results = [];
+  const realClock = clock;
+  let t = 0;
+  clock = () => t;
+  silent = true;
+  try {
+    for (let g = 0; g < games; g++) {
+      resetRound(newEngine(), 0);
+      state.next = randLevel(table);
+      let drops = 0, dangerSince = 0, over = false;
+      while (!over && drops < maxDrops) {
+        const same = kaiBodies().filter(b => !b.merged && b.kaiLevel === state.current);
+        const target = same.length && seedRand() < aimRate ? same.reduce((a, b) => (a.position.y < b.position.y ? a : b)) : null;
+        const half = halfWidth(state.current);
+        const x = target ? target.position.x + (seedRand() - 0.5) * 20 : half + seedRand() * (W - 2 * half);
+        makeKai(Math.min(W - half, Math.max(half, x)), FIELD.dropY, state.current);
+        drops += 1;
+        state.current = state.next;
+        state.next = randLevel(table);
+        for (let s = 0; s < steps && !over; s++) {
+          Engine.update(state.engine, PHYSICS.stepMs);
+          mergeNearby();
+          t += PHYSICS.stepMs;
+          const risky = kaiBodies().some(b => t - b.bornAt > RULES.dangerGraceMs && b.bounds.min.y < FIELD.dangerY && Math.abs(b.velocity.y) < 1.2);
+          dangerSince = risky ? (dangerSince || t) : 0;
+          if (risky && t - dangerSince > RULES.dangerHoldMs) over = true;
+        }
+      }
+      results.push({ drops, top: state.topLevel + 1, score: state.score, merges: state.mergeCount, won: state.wonThisGame, ended: over });
+    }
+  } finally {
+    clock = realClock;
+    silent = false;
+    startGame();
+  }
+  return results;
 }
 
 // 测试用：当前所有张楷的位置与等级（只在 ?debug 时挂到 window 上）

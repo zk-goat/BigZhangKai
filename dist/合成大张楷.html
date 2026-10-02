@@ -45,7 +45,13 @@ button {
   border: 2px solid var(--ink); border-radius: 999px; padding: 4px 10px;
   white-space: nowrap;
 }
-@media (max-width: 440px) { .btns button { font-size: .75rem; padding: 3px 7px; } .score { font-size: 1.3rem; } }
+/* 窄屏：标题和分数一行，按钮另起一行居中 */
+@media (max-width: 440px) {
+  .top { flex-wrap: wrap; row-gap: 6px; padding-block: 8px 4px; }
+  .btns { order: 3; flex-basis: 100%; justify-content: center; gap: 6px; }
+  .btns button { font-size: .8rem; padding: 3px 10px; }
+  .score { font-size: 1.3rem; }
+}
 button:hover { background: var(--wall); }
 button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 .stage { flex: 1; min-height: 0; width: 100%; display: flex; justify-content: center; align-items: center; }
@@ -201,6 +207,16 @@ canvas {
 .welcome-card button:disabled { opacity: .7; }
 .welcome-msg { min-height: 1.4em; color: var(--accent) !important; font-weight: 700; }
 .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* 公告牌 */
+.notice-card { gap: 12px; }
+.notice-list { display: grid; gap: 14px; }
+.notice-item h3 { margin: 0 0 6px; font-size: 1rem; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.notice-date { font-family: var(--body); font-size: .75rem; font-weight: 400; color: var(--panel); background: var(--muted); border-radius: 999px; padding: 1px 8px; }
+.notice-item.latest .notice-date { background: var(--accent); }
+.notice-item ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; font-size: .88rem; line-height: 1.55; color: var(--ink); }
+.notice-item + .notice-item { border-top: 2px dashed var(--line); padding-top: 12px; }
+.notice-item:not(.latest) ul { color: var(--muted); }
 </style>
 </head>
 <body>
@@ -211,6 +227,7 @@ canvas {
     <button id="btn-restart" type="button">重开</button>
     <button id="btn-sound" type="button" aria-pressed="true">静音</button>
     <button id="btn-rank" type="button" hidden>排行榜</button>
+    <button id="btn-notice" type="button">公告</button>
   </div>
   <div class="score"><span id="score">0</span><small>最高 <span id="best">0</span></small></div>
 </div>
@@ -252,6 +269,14 @@ canvas {
     <input id="welcome-name" type="text" maxlength="12" placeholder="你的昵称（最多 12 个字）" autocomplete="nickname">
     <button id="btn-welcome" type="button">开始玩</button>
     <p class="welcome-msg" id="welcome-msg" role="status"></p>
+  </div>
+</div>
+
+<div class="overlay" id="notice" hidden>
+  <div class="card notice-card">
+    <h2>更新公告</h2>
+    <div class="notice-list" id="notice-list"></div>
+    <div class="actions"><button id="btn-notice-close" type="button">知道了</button></div>
   </div>
 </div>
 
@@ -370,15 +395,28 @@ const PHYSICS = {
 
 // 玩法与难度
 const RULES = {
-  spawnMaxLevel: 4,        // 只会掉落前 5 级（0~4）
   dropCooldownMs: 450,
   mergeReach: 1.8,         // 同级重心距离 < 半径 × 这个倍数 就合成
   dangerGraceMs: 1200,     // 刚掉下的张楷不算越线
   dangerHoldMs: 2000,      // 越线持续多久判负
   comboWindowMs: 1200,
   winBonus: 200,
+  scoreScale: 1.75,        // 每次合成得分倍率：后期掉大张楷后合成次数变少，按此补回，让新老成绩可比
   tallCap: 2.4             // 细长照片最长边不超过 半径 × 这个倍数
 };
+
+// 掉落表：按“本局合到的最高等级”（从 0 数）选 minTop 不超过它的最后一行；
+// weights[i] 是掉第 i 级的相对概率。场上落单的等级还会额外加一点权重（见 js/spawn.js）。
+// 后期掉更大的张楷，缩短一局时长（模拟：平均投放从 544 次降到约 257 次，平均最高等级反而更高）
+const SPAWN = [
+  { minTop: 0, weights: [1, 1, 1] },
+  { minTop: 4, weights: [1, 1, 1, 1] },
+  { minTop: 5, weights: [1, 1, 1, 1, 1] },
+  { minTop: 6, weights: [0.6, 1, 1, 1, 1, 1] },
+  { minTop: 8, weights: [0.2, 0.6, 1, 1, 1.2, 1.2, 0.8] },
+  { minTop: 10, weights: [0.1, 0.2, 0.5, 1, 1.2, 1.2, 1, 0.8] },
+  { minTop: 12, weights: [0.05, 0.1, 0.3, 0.6, 1, 1.2, 1.2, 1, 0.6] }
+];
 
 // 照片转碰撞轮廓
 const TRACE = {
@@ -405,7 +443,8 @@ const STORAGE_KEYS = {
   playerToken: 'dazhangkai-player-token',
   uploadedBest: 'dazhangkai-uploaded-best',
   pendingRun: 'dazhangkai-pending-run',
-  save: 'dazhangkai-save-v1'
+  save: 'dazhangkai-save-v1',
+  noticeSeen: 'dazhangkai-notice-seen'
 };
 
 const SHARE_URL = 'zk-goat.github.io/BigZhangKai';
@@ -1255,6 +1294,28 @@ async function copyShare() {
   }
 }
 
+// ---- spawn.js ----
+// 掉落：根据本局进度（合到的最高等级）决定下一个掉哪一级。纯函数，可单独测试。
+
+// 场上某一级是单数（落单）时给它加的权重，帮它凑对；也让后期不再常规掉落的小张楷还能被清掉
+const ORPHAN_BOOST = 0.3;
+
+// table: [{ minTop, weights: [第0级权重, 第1级权重, ...] }]，按 minTop 从小到大
+function spawnWeights(top, counts = [], table = SPAWN) {
+  const row = table.filter(r => top >= r.minTop).pop() || table[0];
+  return row.weights.map((w, lv) => w + ((counts[lv] || 0) % 2 === 1 ? ORPHAN_BOOST : 0));
+}
+
+function pickLevel(weights, rand = Math.random) {
+  const total = weights.reduce((a, b) => a + b, 0);
+  let r = rand() * total;
+  for (let lv = 0; lv < weights.length; lv++) {
+    r -= weights[lv];
+    if (r < 0) return lv;
+  }
+  return weights.length - 1;
+}
+
 // ---- effects.js ----
 // 合成反馈：光圈、碎片、飘字、震屏、连击提示。只负责“看起来爽”，不影响玩法。
 
@@ -1352,8 +1413,13 @@ function drawEffects(ctx, now) {
 
 
 
+
 const { Engine, Bodies, Composite, Events, Body } = Matter;
 const W = FIELD.width, H = FIELD.height;
+
+// 模拟测试时替换时钟、关掉特效音效和界面刷新
+let clock = () => performance.now();
+let silent = false;
 
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
@@ -1388,7 +1454,7 @@ function makeKai(x, y, lv) {
   const b = shape
     ? Bodies.fromVertices(x, y, [shape.verts], PHYSICS.body)
     : Bodies.circle(x, y, LEVELS[lv].r, PHYSICS.body);
-  Object.assign(b, { kaiLevel: lv, kaiShaped: !!shape, bornAt: performance.now(), merged: false });
+  Object.assign(b, { kaiLevel: lv, kaiShaped: !!shape, bornAt: clock(), merged: false });
   Composite.add(state.engine.world, b);
   return b;
 }
@@ -1415,7 +1481,7 @@ function mergeNearby() {
 }
 
 function mergePair(a, b) {
-  const lv = a.kaiLevel + 1, now = performance.now();
+  const lv = a.kaiLevel + 1, now = clock();
   a.merged = b.merged = true;
   const x = (a.position.x + b.position.x) / 2, y = (a.position.y + b.position.y) / 2;
   Composite.remove(state.engine.world, [a, b]);
@@ -1428,17 +1494,27 @@ function mergePair(a, b) {
   state.mergeCount += 1;
   state.maxCombo = Math.max(state.maxCombo, state.combo);
   state.topLevel = Math.max(state.topLevel, lv);
-  const gain = lv * 2 + (state.combo >= 2 ? (state.combo - 1) * lv : 0) + (lv === MAX ? RULES.winBonus : 0);
+  const base = lv * 2 + (state.combo >= 2 ? (state.combo - 1) * lv : 0);
+  const gain = Math.round(base * RULES.scoreScale) + (lv === MAX ? RULES.winBonus : 0);
   addScore(gain);
+  if (silent) {
+    if (lv === MAX) state.wonThisGame = true;
+    return;
+  }
   mergeEffects({ x, y, lv, gain, combo: state.combo, now });
-
   if (lv === MAX && !state.wonThisGame) showWin();
   else sfx.merge(lv, state.combo);
   updateHud();
 }
 
 // ---------- 投放与判负 ----------
-const randLevel = () => Math.floor(Math.random() * (Math.min(RULES.spawnMaxLevel, Math.max(2, state.topLevel - 1)) + 1));
+function levelCounts() {
+  const counts = new Array(MAX + 1).fill(0);
+  kaiBodies().forEach(b => { if (!b.merged) counts[b.kaiLevel] += 1; });
+  return counts;
+}
+
+const randLevel = (table) => pickLevel(spawnWeights(state.topLevel, levelCounts(), table));
 
 function clampAim(lv) {
   const half = halfWidth(lv);
@@ -1465,6 +1541,49 @@ function checkDanger(now) {
   if (!risky) { state.dangerSince = 0; return; }
   if (!state.dangerSince) state.dangerSince = now;
   if (now - state.dangerSince > RULES.dangerHoldMs) gameOver();
+}
+
+// ---------- 快速模拟（只在 ?debug 时挂到 window 上，用来调掉落表）----------
+// 不渲染，直接快进物理。策略：大概率对准场上最高处的同级张楷投放，否则随机。
+// 每次投放之间按 thinkMs 推进物理（模拟玩家看一眼再投）。返回每局统计。
+function simulateGames({ games = 10, table, thinkMs = 1000, aimRate = 0.7, maxDrops = 800, seedRand = Math.random } = {}) {
+  const steps = Math.round(thinkMs / PHYSICS.stepMs);
+  const results = [];
+  const realClock = clock;
+  let t = 0;
+  clock = () => t;
+  silent = true;
+  try {
+    for (let g = 0; g < games; g++) {
+      resetRound(newEngine(), 0);
+      state.next = randLevel(table);
+      let drops = 0, dangerSince = 0, over = false;
+      while (!over && drops < maxDrops) {
+        const same = kaiBodies().filter(b => !b.merged && b.kaiLevel === state.current);
+        const target = same.length && seedRand() < aimRate ? same.reduce((a, b) => (a.position.y < b.position.y ? a : b)) : null;
+        const half = halfWidth(state.current);
+        const x = target ? target.position.x + (seedRand() - 0.5) * 20 : half + seedRand() * (W - 2 * half);
+        makeKai(Math.min(W - half, Math.max(half, x)), FIELD.dropY, state.current);
+        drops += 1;
+        state.current = state.next;
+        state.next = randLevel(table);
+        for (let s = 0; s < steps && !over; s++) {
+          Engine.update(state.engine, PHYSICS.stepMs);
+          mergeNearby();
+          t += PHYSICS.stepMs;
+          const risky = kaiBodies().some(b => t - b.bornAt > RULES.dangerGraceMs && b.bounds.min.y < FIELD.dangerY && Math.abs(b.velocity.y) < 1.2);
+          dangerSince = risky ? (dangerSince || t) : 0;
+          if (risky && t - dangerSince > RULES.dangerHoldMs) over = true;
+        }
+      }
+      results.push({ drops, top: state.topLevel + 1, score: state.score, merges: state.mergeCount, won: state.wonThisGame, ended: over });
+    }
+  } finally {
+    clock = realClock;
+    silent = false;
+    startGame();
+  }
+  return results;
 }
 
 // 测试用：当前所有张楷的位置与等级（只在 ?debug 时挂到 window 上）
@@ -1793,8 +1912,92 @@ function bindWelcome() {
   $('welcome-name').addEventListener('keydown', e => { if (e.key === 'Enter') submitName(); });
 }
 
+// ---- announcements.js ----
+// 更新公告：最新的放最前面。每次更新加一条，id 不能重复（打开游戏时，没看过最新一条的玩家会自动弹出）。
+const ANNOUNCEMENTS = [
+  {
+    id: '2026-10-03',
+    date: '10 月 3 日',
+    title: '一局更快、存档和公告牌',
+    items: [
+      '后期会直接掉更大的张楷，一局时间大约缩短一半，也更容易合到高等级；每次合成的得分相应提高，和以前的成绩可以放在一起比',
+      '新增公告牌：每次更新都会在这里告诉大家，顶部的“公告”按钮随时能看',
+      '退出再进来能接着玩：游戏会自动存档，下次打开自动恢复上一局，不想要可以点“重新开始”',
+      '第一次打开先起个昵称，全班唯一，成绩自动进排行榜',
+      '排行榜加了防刷分检查，明显伪造的成绩会被拒绝',
+      '网络不好上传失败时，成绩先存在手机里，联网后自动补传',
+      '修了一批问题：打开“换头像”或看排行榜时游戏会暂停；看完庆祝画面不会再立刻判负；苹果手机切回来后有声音了'
+    ]
+  },
+  {
+    id: '2026-10-02',
+    date: '10 月 2 日',
+    title: '第二版：14 级张楷和全班排行榜',
+    items: [
+      '新增夹克楷、守门楷、队长楷，一共 14 级，合出大张楷更难了',
+      '合成有了碎片、震屏、连击加分',
+      '结算改成战报卡，可以截图、复制战绩发群里',
+      '全班排行榜上线'
+    ]
+  }
+];
+
+// ---- notice.js ----
+// 公告牌：有没看过的更新时自动弹一次；顶栏“公告”按钮随时回看。
+
+
+
+
+
+const latestId = () => (ANNOUNCEMENTS[0] ? ANNOUNCEMENTS[0].id : '');
+const markSeen = () => store.set(STORAGE_KEYS.noticeSeen, latestId());
+let pausedByNotice = false;
+
+function renderNotices() {
+  $('notice-list').replaceChildren(...ANNOUNCEMENTS.map((a, i) => {
+    const sec = document.createElement('section');
+    sec.className = 'notice-item' + (i === 0 ? ' latest' : '');
+    const head = document.createElement('h3');
+    const date = document.createElement('span'); date.className = 'notice-date'; date.textContent = a.date;
+    head.append(date, document.createTextNode(a.title));
+    const ul = document.createElement('ul');
+    ul.append(...a.items.map(text => {
+      const li = document.createElement('li'); li.textContent = text; return li;
+    }));
+    sec.append(head, ul);
+    return sec;
+  }));
+}
+
+function openNotice() {
+  pausedByNotice = !state.over && !state.paused;
+  if (pausedByNotice) state.paused = true;
+  renderNotices();
+  $('notice').hidden = false;
+}
+
+function closeNotice() {
+  markSeen();
+  $('notice').hidden = true;
+  if (pausedByNotice) state.paused = false;
+  pausedByNotice = false;
+}
+
+// 老玩家有没看过的最新公告就弹出来；第一次来的新玩家不用看“更新了什么”，直接记为已读
+function showNoticeIfNew({ isNewPlayer }) {
+  if (!latestId()) return;
+  if (isNewPlayer) { markSeen(); return; }
+  if (store.get(STORAGE_KEYS.noticeSeen) !== latestId()) openNotice();
+}
+
+function bindNotice() {
+  $('btn-notice').addEventListener('click', openNotice);
+  $('btn-notice-close').addEventListener('click', closeNotice);
+}
+
 // ---- main.js ----
 // 启动：加载照片 → 开局 → 绑定按钮。链接带 ?test=win / ?test=over（可加 &score=分数）时直接展示庆祝画面 / 示例战报。
+
 
 
 
@@ -1832,12 +2035,13 @@ function bindButtons() {
   bindSettings({ onRename: updateHud, onChanged: startGame });
   bindRankboard();
   bindWelcome();
+  bindNotice();
   renderSoundBtn();
 }
 
 function runTestHooks() {
   const q = location.search;
-  if (/[?&]debug/.test(q)) window.zkDebug = debugSnapshot;
+  if (/[?&]debug/.test(q)) Object.assign(window, { zkDebug: debugSnapshot, zkSim: simulateGames });
   if (/[?&]test=win/.test(q)) {
     makeKai(FIELD.width / 2 - 60, 250, MAX - 1);
     makeKai(FIELD.width / 2 + 60, 250, MAX - 1);
@@ -1864,7 +2068,11 @@ async function boot() {
   } else {
     startGame();
   }
-  if (!/[?&]test=/.test(location.search)) showWelcomeIfNeeded();
+  if (!/[?&]test=/.test(location.search)) {
+    const isNewPlayer = needsWelcome();
+    showWelcomeIfNeeded();
+    showNoticeIfNew({ isNewPlayer });
+  }
   requestAnimationFrame(loop);
   runTestHooks();
   flushPending();

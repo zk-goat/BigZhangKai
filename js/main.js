@@ -4,11 +4,12 @@ import { initSkin } from './skin.js';
 import { isMuted, toggleMuted } from './audio.js';
 import { state } from './state.js';
 import { copyShare, gameOver } from './report.js';
-import { startGame, restoreGame, loop, fit, bindInput, makeKai, updateHud, debugSnapshot } from './game.js';
+import { startGame, restoreGame, loop, fit, bindInput, makeKai, updateHud, debugSnapshot, simulateGames } from './game.js';
 import { readSave } from './save.js';
 import { bindSettings } from './settings.js';
 import { bindRankboard, flushPending } from './rankboard.js';
-import { bindWelcome, showWelcomeIfNeeded } from './welcome.js';
+import { bindWelcome, showWelcomeIfNeeded, needsWelcome } from './welcome.js';
+import { bindNotice, showNoticeIfNew } from './notice.js';
 import { $ } from './dom.js';
 
 function renderSoundBtn() {
@@ -37,12 +38,13 @@ function bindButtons() {
   bindSettings({ onRename: updateHud, onChanged: startGame });
   bindRankboard();
   bindWelcome();
+  bindNotice();
   renderSoundBtn();
 }
 
 function runTestHooks() {
   const q = location.search;
-  if (/[?&]debug/.test(q)) window.zkDebug = debugSnapshot;
+  if (/[?&]debug/.test(q)) Object.assign(window, { zkDebug: debugSnapshot, zkSim: simulateGames });
   if (/[?&]test=win/.test(q)) {
     makeKai(FIELD.width / 2 - 60, 250, MAX - 1);
     makeKai(FIELD.width / 2 + 60, 250, MAX - 1);
@@ -69,7 +71,11 @@ async function boot() {
   } else {
     startGame();
   }
-  if (!/[?&]test=/.test(location.search)) showWelcomeIfNeeded();
+  if (!/[?&]test=/.test(location.search)) {
+    const isNewPlayer = needsWelcome();
+    showWelcomeIfNeeded();
+    showNoticeIfNew({ isNewPlayer });
+  }
   requestAnimationFrame(loop);
   runTestHooks();
   flushPending();

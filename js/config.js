@@ -41,15 +41,28 @@ export const PHYSICS = {
 
 // 玩法与难度
 export const RULES = {
-  spawnMaxLevel: 4,        // 只会掉落前 5 级（0~4）
   dropCooldownMs: 450,
   mergeReach: 1.8,         // 同级重心距离 < 半径 × 这个倍数 就合成
   dangerGraceMs: 1200,     // 刚掉下的张楷不算越线
   dangerHoldMs: 2000,      // 越线持续多久判负
   comboWindowMs: 1200,
   winBonus: 200,
+  scoreScale: 1.75,        // 每次合成得分倍率：后期掉大张楷后合成次数变少，按此补回，让新老成绩可比
   tallCap: 2.4             // 细长照片最长边不超过 半径 × 这个倍数
 };
+
+// 掉落表：按“本局合到的最高等级”（从 0 数）选 minTop 不超过它的最后一行；
+// weights[i] 是掉第 i 级的相对概率。场上落单的等级还会额外加一点权重（见 js/spawn.js）。
+// 后期掉更大的张楷，缩短一局时长（模拟：平均投放从 544 次降到约 257 次，平均最高等级反而更高）
+export const SPAWN = [
+  { minTop: 0, weights: [1, 1, 1] },
+  { minTop: 4, weights: [1, 1, 1, 1] },
+  { minTop: 5, weights: [1, 1, 1, 1, 1] },
+  { minTop: 6, weights: [0.6, 1, 1, 1, 1, 1] },
+  { minTop: 8, weights: [0.2, 0.6, 1, 1, 1.2, 1.2, 0.8] },
+  { minTop: 10, weights: [0.1, 0.2, 0.5, 1, 1.2, 1.2, 1, 0.8] },
+  { minTop: 12, weights: [0.05, 0.1, 0.3, 0.6, 1, 1.2, 1.2, 1, 0.6] }
+];
 
 // 照片转碰撞轮廓
 export const TRACE = {
@@ -76,7 +89,8 @@ export const STORAGE_KEYS = {
   playerToken: 'dazhangkai-player-token',
   uploadedBest: 'dazhangkai-uploaded-best',
   pendingRun: 'dazhangkai-pending-run',
-  save: 'dazhangkai-save-v1'
+  save: 'dazhangkai-save-v1',
+  noticeSeen: 'dazhangkai-notice-seen'
 };
 
 export const SHARE_URL = 'zk-goat.github.io/BigZhangKai';
