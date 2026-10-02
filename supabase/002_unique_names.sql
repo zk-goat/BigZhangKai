@@ -27,16 +27,16 @@ revoke select, insert on public.scores from anon;
 create or replace function public._player_id(p_token text)
 returns bigint
 language sql stable security definer set search_path = public, extensions
-as $$
+as $fn$
   select id from players where token_hash = encode(extensions.digest(p_token, 'sha256'), 'hex');
-$$;
+$fn$;
 revoke execute on function public._player_id(text) from public, anon;
 
 -- 占用/修改昵称：返回 'ok' 或 'taken'
 create or replace function public.claim_name(p_token text, p_name text)
 returns text
 language plpgsql security definer set search_path = public, extensions
-as $$
+as $fn$
 declare
   v_name text := btrim(p_name);
   v_id   bigint;
@@ -55,13 +55,13 @@ begin
   end;
   return 'ok';
 end;
-$$;
+$fn$;
 
 -- 提交一局成绩：返回这位玩家最高分的名次；身份码没占过昵称返回 null
 create or replace function public.submit_score(p_token text, p_score integer, p_top_level smallint, p_merges integer, p_duration integer)
 returns integer
 language plpgsql security definer set search_path = public, extensions
-as $$
+as $fn$
 declare
   v_id   bigint := public._player_id(p_token);
   v_best integer;
@@ -76,13 +76,13 @@ begin
     ) t where t.best > v_best
   );
 end;
-$$;
+$fn$;
 
 -- 榜单：每位玩家只取最高分；is_me 标出调用者自己
 create or replace function public.top_scores(p_token text, p_limit integer default 20)
 returns table (name text, score integer, top_level smallint, created_at timestamptz, is_me boolean)
 language sql stable security definer set search_path = public, extensions
-as $$
+as $fn$
   select p.name, b.score, b.top_level, b.created_at, p.id = public._player_id(p_token)
   from (
     select distinct on (player_id) player_id, score, top_level, created_at
@@ -92,7 +92,7 @@ as $$
   join players p on p.id = b.player_id
   order by b.score desc, b.created_at asc
   limit least(greatest(p_limit, 1), 100);
-$$;
+$fn$;
 
 grant execute on function public.claim_name(text, text) to anon;
 grant execute on function public.submit_score(text, integer, smallint, integer, integer) to anon;
