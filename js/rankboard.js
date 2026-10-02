@@ -1,15 +1,11 @@
 // 排行榜界面：顶栏“排行榜”弹窗 + 战报卡上的自动上榜。
-// 第一次结束时填一次昵称，以后每局结束自动上传；只有破了自己的纪录才传，榜上每人只显示最高分。
+// 第一次结束时占一个昵称（全班唯一），以后每局结束自动上传；只有破了自己的纪录才传。
 import { STORAGE_KEYS } from './config.js';
 import { skin, store } from './skin.js';
 import { state } from './state.js';
 import { $ } from './dom.js';
-import { leaderboardEnabled, fetchTop, submitScore, rankOf, cleanName } from './leaderboard.js';
+import { leaderboardEnabled, fetchTop, submitScore, claimName, cleanName } from './leaderboard.js';
 
-const myIds = () => {
-  try { return new Set(JSON.parse(store.get(STORAGE_KEYS.myScores) || '[]')); } catch { return new Set(); }
-};
-const rememberId = id => store.set(STORAGE_KEYS.myScores, JSON.stringify([...myIds(), id].slice(-50)));
 const playerName = () => store.get(STORAGE_KEYS.playerName) || '';
 const uploadedBest = () => Number(store.get(STORAGE_KEYS.uploadedBest)) || 0;
 
@@ -18,11 +14,10 @@ let pausedByBoard = false;
 
 // ---------- 排行榜弹窗 ----------
 function renderList(rows) {
-  const mine = myIds();
   $('rank-list').replaceChildren(...rows.map((r, i) => {
     const li = document.createElement('li');
     if (i < 3) li.classList.add('top' + (i + 1));
-    if (mine.has(r.id)) li.classList.add('mine');
+    if (r.is_me) li.classList.add('mine');
     const no = document.createElement('span'); no.className = 'no'; no.textContent = i + 1;
     const who = document.createElement('span'); who.className = 'who';
     const nm = document.createElement('b'); nm.textContent = r.name;
@@ -61,6 +56,8 @@ function closeBoard() {
 }
 
 // ---------- 战报卡上的上榜区 ----------
+const setMsg = text => { $('upload-msg').textContent = text; };
+
 function showNameForm(prefill, buttonText) {
   $('upload-ask').hidden = false;
   $('upload-auto').hidden = true;
@@ -75,46 +72,71 @@ function showNameLine(name) {
   $('player-label').textContent = name;
 }
 
+function showRetry(message) {
+  setMsg(message + '，');
+  const retry = document.createElement('button');
+  Object.assign(retry, { className: 'linkish', type: 'button', textContent: '点这里重试' });
+  retry.addEventListener('click', autoUpload);
+  $('upload-msg').append(retry);
+}
+
 async function autoUpload() {
-  const name = playerName();
-  if (!name || uploadedThisRound) return;
+  if (!playerName() || uploadedThisRound) return;
   const best = uploadedBest();
   if (state.score <= 0 || state.score <= best) {
-    $('upload-msg').textContent = best > 0 ? `本局没破纪录，榜上保留你的最高分 ${best}` : '本局 0 分，没有上传';
+    setMsg(best > 0 ? `本局没破纪录，榜上保留你的最高分 ${best}` : '本局 0 分，没有上传');
     return;
   }
   uploadedThisRound = true;
-  $('upload-msg').textContent = '正在上榜…';
+  setMsg('正在上榜…');
   try {
-    const id = await submitScore({
-      name, score: state.score, topLevel: state.topLevel, merges: state.mergeCount,
+    const rank = await submitScore({
+      score: state.score, topLevel: state.topLevel, merges: state.mergeCount,
       durationS: (Date.now() - state.startedAt) / 1000
     });
-    if (id) rememberId(id);
+    if (rank === null) {
+      // 服务器不认识这台设备（换了浏览器/数据被清）：重新占一次昵称
+      const oldName = playerName();
+      uploadedThisRound = false;
+      store.set(STORAGE_KEYS.playerName, '');
+      showNameForm(oldName, '保存并上榜');
+      setMsg('需要重新确认一下昵称');
+      return;
+    }
     store.set(STORAGE_KEYS.uploadedBest, String(state.score));
-    const rank = await rankOf(state.score).catch(() => null);
-    $('upload-msg').textContent = rank ? `已自动上榜，全班第 ${rank} 名` : '已自动上榜';
+    setMsg(`已自动上榜，全班第 ${rank} 名`);
   } catch (err) {
     uploadedThisRound = false;
-    $('upload-msg').textContent = err.message + '，';
-    const retry = document.createElement('button');
-    retry.className = 'linkish'; retry.type = 'button'; retry.textContent = '点这里重试';
-    retry.addEventListener('click', autoUpload);
-    $('upload-msg').append(retry);
+    showRetry(err.message);
   }
 }
 
-function saveName() {
+async function saveName() {
   const name = cleanName($('player-name').value);
-  if (!name) { $('upload-msg').textContent = '先填一个昵称'; $('player-name').focus(); return; }
-  // 换了昵称就从头记最高分，这局成绩用新昵称上榜
-  if (name !== playerName()) {
-    store.set(STORAGE_KEYS.uploadedBest, '0');
-    uploadedThisRound = false;
+  if (!name) { setMsg('先填一个昵称'); $('player-name').focus(); return; }
+  if (name === playerName()) { showNameLine(name); return; }
+  $('btn-upload').disabled = true;
+  setMsg('检查昵称…');
+  try {
+    if (!(await claimName(name))) {
+      $('btn-upload').disabled = false;
+      setMsg(`「${name}」已经被别人用了，换一个`);
+      $('player-name').focus();
+      return;
+    }
+    const isRename = Boolean(playerName());
+    store.set(STORAGE_KEYS.playerName, name);
+    showNameLine(name);
+    if (isRename) {
+      setMsg(`昵称已改成「${name}」，之前的成绩也跟着改名`);
+    } else {
+      store.set(STORAGE_KEYS.uploadedBest, '0');
+      autoUpload();
+    }
+  } catch (err) {
+    $('btn-upload').disabled = false;
+    setMsg(err.message);
   }
-  store.set(STORAGE_KEYS.playerName, name);
-  showNameLine(name);
-  autoUpload();
 }
 
 // 每局结束时调用
@@ -122,7 +144,7 @@ export function onRoundOver() {
   uploadedThisRound = false;
   $('upload').hidden = !leaderboardEnabled();
   if (!leaderboardEnabled()) return;
-  $('upload-msg').textContent = '';
+  setMsg('');
   const name = playerName();
   if (name) {
     showNameLine(name);

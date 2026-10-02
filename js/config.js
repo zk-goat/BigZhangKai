@@ -73,7 +73,7 @@ export const STORAGE_KEYS = {
   board: 'dazhangkai-board-v1',
   muted: 'dazhangkai-muted',
   playerName: 'dazhangkai-name',
-  myScores: 'dazhangkai-my-scores',
+  playerToken: 'dazhangkai-player-token',
   uploadedBest: 'dazhangkai-uploaded-best'
 };
 
