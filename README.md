@@ -34,9 +34,13 @@ python -m http.server 8000
 
 然后访问 http://localhost:8000 。链接后加 `?test=win` 直接看庆祝画面，加 `?test=over` 直接看示例战报。
 
-## 测试与打包
+## 测试、打包与发布
 
 ```
-npm test                 # 几何函数单元测试
-python tools/bundle.py   # 生成 dist/合成大张楷.html，完全离线，可直接发微信
+npm test                     # 单元测试
+python tools/bundle.py       # 生成 dist/合成大张楷.html，完全离线，可直接发微信
+python tools/build_site.py   # 生成 docs/ 线上发布副本（GitHub Pages 从 docs/ 发布）
 ```
+
+`docs/` 和源代码的唯一区别是所有资源地址都带按内容计算的版本号（如 `js/game.js?v=1a2b3c4d`），
+文件一改地址就变，玩家手机不会继续用旧缓存。每次发布前运行 `build_site.py` 再提交推送。
