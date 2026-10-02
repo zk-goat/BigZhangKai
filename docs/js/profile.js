@@ -1,8 +1,8 @@
 // 自己的头像：本机缓存一份，换头像时同时上传到服务器
 import { STORAGE_KEYS } from './config.js?v=19e16d6c';
-import { store } from './skin.js?v=c519b08c';
-import { setAvatar, myProfile, claimName } from './leaderboard.js?v=274d39d7';
-import { avatarEl, makeAvatar } from './avatar.js?v=950f7d8a';
+import { store } from './skin.js?v=db8d0fbb';
+import { setAvatar, myProfile, claimName } from './leaderboard.js?v=4c1b28ad';
+import { avatarEl, makeAvatar } from './avatar.js?v=254699f4';
 
 export const myAvatar = () => store.get(STORAGE_KEYS.avatar) || '';
 

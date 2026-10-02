@@ -1,12 +1,12 @@
 // 排行榜界面：顶栏“排行榜”弹窗 + 战报卡上的自动上榜。
 // 第一次结束时占一个昵称（全班唯一），以后每局结束自动上传；只有破了自己的纪录才传。
 import { STORAGE_KEYS } from './config.js?v=19e16d6c';
-import { skin, store } from './skin.js?v=c519b08c';
-import { state } from './state.js?v=6ff1b6c5';
+import { skin, store } from './skin.js?v=db8d0fbb';
+import { state } from './state.js?v=a3d7fb92';
 import { $ } from './dom.js?v=5b57db68';
-import { leaderboardEnabled, fetchTop, submitScore, claimName, cleanName, canPersist } from './leaderboard.js?v=274d39d7';
-import { avatarEl, makeAvatar } from './avatar.js?v=950f7d8a';
-import { myAvatar, uploadAvatar, renderMeBar } from './profile.js?v=300d68e0';
+import { leaderboardEnabled, fetchTop, submitScore, claimName, cleanName, canPersist } from './leaderboard.js?v=4c1b28ad';
+import { avatarEl, makeAvatar } from './avatar.js?v=254699f4';
+import { myAvatar, uploadAvatar, renderMeBar } from './profile.js?v=22b20b08';
 
 const playerName = () => store.get(STORAGE_KEYS.playerName) || '';
 const uploadedBest = () => Number(store.get(STORAGE_KEYS.uploadedBest)) || 0;

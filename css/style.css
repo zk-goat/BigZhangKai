@@ -72,17 +72,6 @@ canvas {
 }
 .card h2 { font-family: var(--display); font-weight: 400; margin: 0; font-size: 1.4rem; }
 .card p { margin: 0; font-size: .85rem; color: var(--muted); line-height: 1.6; }
-.rows { display: grid; gap: 8px; }
-.row { display: grid; grid-template-columns: 22px 48px 1fr auto; gap: 8px; align-items: center; }
-.row .n { font-variant-numeric: tabular-nums; color: var(--muted); font-size: .8rem; text-align: right; }
-.row canvas { border-width: 2px; border-radius: 50%; background: var(--panel); }
-.row input[type=text] {
-  font: inherit; font-size: .9rem; min-width: 0; width: 100%; box-sizing: border-box;
-  padding: 4px 8px; border: 2px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink);
-}
-.row label.up { font-size: .8rem; border: 2px solid var(--ink); border-radius: 999px; padding: 3px 10px; cursor: pointer; white-space: nowrap; }
-.row label.up input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
-.row label.up { position: relative; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .card .big { font-family: var(--display); font-size: 3rem; color: var(--accent); text-align: center; margin: 0; line-height: 1; }
 .badge {

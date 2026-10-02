@@ -43,17 +43,3 @@ export function loadImage(src) {
     img.src = src;
   });
 }
-
-// 读取用户上传的照片并生成轮廓
-export function readPhoto(file) {
-  return new Promise((resolve, reject) => {
-    const fr = new FileReader();
-    fr.onerror = () => reject(new Error('读取图片失败'));
-    fr.onload = () => {
-      loadImage(fr.result)
-        .then(img => resolve(traceImage(img)))
-        .catch(err => reject(new Error(err.message.startsWith('图片是全透明') ? err.message : '这个文件不是可识别的图片')));
-    };
-    fr.readAsDataURL(file);
-  });
-}

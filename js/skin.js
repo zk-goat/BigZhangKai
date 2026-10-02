@@ -1,4 +1,4 @@
-// 皮肤：每一级的名字、照片和碰撞轮廓。内置照片开局加载；玩家在“换头像”里改的存在本机。
+// 皮肤：每一级的名字、照片和碰撞轮廓。照片统一用 config.js 里的内置照片，玩家不能自己换。
 import { LEVELS, RULES, STORAGE_KEYS } from './config.js';
 import { traceImage, loadImage } from './trace.js';
 
@@ -10,34 +10,15 @@ export const store = {
 const blankSkin = () => LEVELS.map(l => ({ name: l.name, photo: null }));
 
 export let skin = blankSkin();
-let defaultSkin = blankSkin();
 const photoCache = new Map();
 
-export function setSkin(next) {
-  skin = next;
-  store.set(STORAGE_KEYS.skin, JSON.stringify(skin));
-}
-
-export function resetSkin() {
-  setSkin(defaultSkin);
-}
-
-function loadSavedSkin() {
-  try {
-    const s = JSON.parse(store.get(STORAGE_KEYS.skin) || 'null');
-    const valid = Array.isArray(s) && s.length === LEVELS.length
-      && s.every(x => x && typeof x.name === 'string' && (x.photo === null || (typeof x.photo === 'string' && x.shape)));
-    return valid ? s : null;
-  } catch { return null; }
-}
-
-// 读取内置照片并生成轮廓；有本机保存的皮肤就优先用它
+// 读取内置照片并生成轮廓。以前版本允许玩家在本机换照片，那份存档已作废，顺手清掉腾出空间
 export async function initSkin() {
-  defaultSkin = await Promise.all(LEVELS.map(async l => {
+  try { localStorage.removeItem(STORAGE_KEYS.skin); } catch { /* 存储不可用就算了 */ }
+  skin = await Promise.all(LEVELS.map(async l => {
     try { return { name: l.name, ...traceImage(await loadImage(l.image)) }; }
     catch { return { name: l.name, photo: null }; }
   }));
-  skin = loadSavedSkin() || defaultSkin;
   skin.forEach((_, i) => photoImg(i));  // 预加载，避免第一次出现时退回卡通脸
 }
 

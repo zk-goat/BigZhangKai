@@ -1,7 +1,7 @@
 // 一局进行中的存档：场上每个张楷 + 本局状态。退出再进来能接着玩。
 // 只存在本机；游戏结束或主动重开时清空。
 import { MAX, FIELD, STORAGE_KEYS } from './config.js?v=19e16d6c';
-import { store } from './skin.js?v=c519b08c';
+import { store } from './skin.js?v=db8d0fbb';
 
 const SAVE_VERSION = 1;
 const MAX_BODIES = 400;

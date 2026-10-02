@@ -79,17 +79,6 @@ canvas {
 }
 .card h2 { font-family: var(--display); font-weight: 400; margin: 0; font-size: 1.4rem; }
 .card p { margin: 0; font-size: .85rem; color: var(--muted); line-height: 1.6; }
-.rows { display: grid; gap: 8px; }
-.row { display: grid; grid-template-columns: 22px 48px 1fr auto; gap: 8px; align-items: center; }
-.row .n { font-variant-numeric: tabular-nums; color: var(--muted); font-size: .8rem; text-align: right; }
-.row canvas { border-width: 2px; border-radius: 50%; background: var(--panel); }
-.row input[type=text] {
-  font: inherit; font-size: .9rem; min-width: 0; width: 100%; box-sizing: border-box;
-  padding: 4px 8px; border: 2px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink);
-}
-.row label.up { font-size: .8rem; border: 2px solid var(--ink); border-radius: 999px; padding: 3px 10px; cursor: pointer; white-space: nowrap; }
-.row label.up input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
-.row label.up { position: relative; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .card .big { font-family: var(--display); font-size: 3rem; color: var(--accent); text-align: center; margin: 0; line-height: 1; }
 .badge {
@@ -289,7 +278,6 @@ label.linkish { cursor: pointer; }
 <div class="top">
   <h1>合成大张楷</h1>
   <div class="btns">
-    <button id="btn-set" type="button">皮肤</button>
     <button id="btn-restart" type="button">重开</button>
     <button id="btn-sound" type="button" aria-pressed="true">静音</button>
     <button id="btn-rank" type="button" hidden>排行</button>
@@ -304,19 +292,6 @@ label.linkish { cursor: pointer; }
 </div>
 <div class="stage"><canvas id="game" aria-label="游戏画布"></canvas></div>
 <div class="ladder" id="ladder"></div>
-
-<div class="overlay" id="settings" hidden>
-  <div class="card">
-    <h2>定制每一级张楷</h2>
-    <p>给每个等级上传一张抠好图的透明 PNG，他的脑袋轮廓就是碰撞形状；没抠的照片会变成方块。改完点“完成”会重开一局。照片只存在这台设备的浏览器里，不会上传。</p>
-    <div class="rows" id="rows"></div>
-    <div class="actions">
-      <label class="up" style="border:2px solid var(--ink);border-radius:999px;padding:4px 12px;cursor:pointer;font-size:.85rem">一张照片用到全部<input id="up-all" class="sr-only" type="file" accept="image/*"></label>
-      <button id="btn-reset-skin" type="button">恢复默认</button>
-      <button id="btn-close" type="button">完成</button>
-    </div>
-  </div>
-</div>
 
 <div class="overlay" id="win" hidden>
   <div class="card" style="align-items:center;text-align:center">
@@ -661,22 +636,8 @@ function loadImage(src) {
   });
 }
 
-// 读取用户上传的照片并生成轮廓
-function readPhoto(file) {
-  return new Promise((resolve, reject) => {
-    const fr = new FileReader();
-    fr.onerror = () => reject(new Error('读取图片失败'));
-    fr.onload = () => {
-      loadImage(fr.result)
-        .then(img => resolve(traceImage(img)))
-        .catch(err => reject(new Error(err.message.startsWith('图片是全透明') ? err.message : '这个文件不是可识别的图片')));
-    };
-    fr.readAsDataURL(file);
-  });
-}
-
 // ---- skin.js ----
-// 皮肤：每一级的名字、照片和碰撞轮廓。内置照片开局加载；玩家在“换头像”里改的存在本机。
+// 皮肤：每一级的名字、照片和碰撞轮廓。照片统一用 config.js 里的内置照片，玩家不能自己换。
 
 
 const store = {
@@ -687,34 +648,15 @@ const store = {
 const blankSkin = () => LEVELS.map(l => ({ name: l.name, photo: null }));
 
 let skin = blankSkin();
-let defaultSkin = blankSkin();
 const photoCache = new Map();
 
-function setSkin(next) {
-  skin = next;
-  store.set(STORAGE_KEYS.skin, JSON.stringify(skin));
-}
-
-function resetSkin() {
-  setSkin(defaultSkin);
-}
-
-function loadSavedSkin() {
-  try {
-    const s = JSON.parse(store.get(STORAGE_KEYS.skin) || 'null');
-    const valid = Array.isArray(s) && s.length === LEVELS.length
-      && s.every(x => x && typeof x.name === 'string' && (x.photo === null || (typeof x.photo === 'string' && x.shape)));
-    return valid ? s : null;
-  } catch { return null; }
-}
-
-// 读取内置照片并生成轮廓；有本机保存的皮肤就优先用它
+// 读取内置照片并生成轮廓。以前版本允许玩家在本机换照片，那份存档已作废，顺手清掉腾出空间
 async function initSkin() {
-  defaultSkin = await Promise.all(LEVELS.map(async l => {
+  try { localStorage.removeItem(STORAGE_KEYS.skin); } catch { /* 存储不可用就算了 */ }
+  skin = await Promise.all(LEVELS.map(async l => {
     try { return { name: l.name, ...traceImage(await loadImage(l.image)) }; }
     catch { return { name: l.name, photo: null }; }
   }));
-  skin = loadSavedSkin() || defaultSkin;
   skin.forEach((_, i) => photoImg(i));  // 预加载，避免第一次出现时退回卡通脸
 }
 
@@ -2333,96 +2275,6 @@ function bindInput() {
   window.addEventListener('pagehide', saveNow);
 }
 
-// ---- settings.js ----
-// “换头像”面板：给每一级换照片、改名字。改动存在本机，关闭面板时如有改动就重开一局。
-
-
-
-
-
-
-const NAME_MAX_LEN = 8;
-let dirty = false;
-let pausedBySettings = false;
-
-function updateLevel(i, patch) {
-  setSkin(skin.map((x, j) => (j === i ? { ...x, ...patch } : x)));
-  dirty = true;
-}
-
-function renderRows(onRename) {
-  $('rows').replaceChildren(...skin.map((s, i) => {
-    const row = document.createElement('div'); row.className = 'row';
-    const n = document.createElement('span'); n.className = 'n'; n.textContent = i + 1;
-
-    const pv = document.createElement('canvas'); pv.width = pv.height = 96;
-    pv.style.width = pv.style.height = '44px';
-    const paint = () => {
-      const pc = pv.getContext('2d');
-      pc.clearRect(0, 0, 96, 96);
-      drawKai(pc, 48, 50, i === MAX ? 32 : 36, i);
-    };
-    paint(); setTimeout(paint, 120);
-
-    const name = document.createElement('input');
-    Object.assign(name, { type: 'text', id: 'name-' + i, value: s.name, maxLength: NAME_MAX_LEN });
-    name.setAttribute('aria-label', `第 ${i + 1} 级名字`);
-    name.addEventListener('input', () => {
-      updateLevel(i, { name: name.value.trim() || LEVELS[i].name });
-      onRename(); paint();
-    });
-
-    const up = document.createElement('label'); up.className = 'up';
-    up.append(document.createTextNode(s.photo ? '换照片' : '传照片'));
-    const fi = document.createElement('input');
-    Object.assign(fi, { type: 'file', accept: 'image/*', id: 'photo-' + i });
-    fi.addEventListener('change', async () => {
-      if (!fi.files[0]) return;
-      try {
-        updateLevel(i, await readPhoto(fi.files[0]));
-        renderRows(onRename);
-      } catch (err) {
-        up.firstChild.textContent = err.message;  // 只改文字，保留里面的文件选择框
-        fi.value = '';
-      }
-    });
-    up.append(fi);
-    row.append(n, pv, name, up);
-    return row;
-  }));
-}
-
-// onRename：名字改了要刷新进度条；onChanged：关闭面板时有改动就重开
-function bindSettings({ onRename, onChanged }) {
-  $('btn-set').addEventListener('click', () => {
-    pausedBySettings = !state.over && !state.paused;
-    if (pausedBySettings) state.paused = true;
-    renderRows(onRename);
-    $('settings').hidden = false;
-  });
-  $('btn-close').addEventListener('click', () => {
-    $('settings').hidden = true;
-    if (pausedBySettings) state.paused = false;
-    pausedBySettings = false;
-    if (dirty) { dirty = false; onChanged(); }
-  });
-  $('btn-reset-skin').addEventListener('click', () => {
-    resetSkin(); dirty = true;
-    renderRows(onRename); onRename();
-  });
-  $('up-all').addEventListener('change', async e => {
-    const f = e.target.files[0];
-    e.target.value = '';
-    if (!f) return;
-    try {
-      const data = await readPhoto(f);
-      setSkin(skin.map(x => ({ ...x, ...data })));
-      dirty = true;
-      renderRows(onRename);
-    } catch { /* 读不了就不改 */ }
-  });
-}
-
 // ---- welcome.js ----
 // 欢迎页：第一次打开时输入昵称（全班唯一）。已经有昵称的老玩家直接进游戏。
 // 连不上排行榜时也放行：昵称先存在本机，等下次上榜时再向服务器确认。
@@ -2520,8 +2372,7 @@ const ANNOUNCEMENTS = [
     items: [
       '顶部新增“留言”：想对张楷说的话都可以写在这里，所有人都能看到',
       '署名用你的游戏昵称，每条最多 200 字，30 秒内只能发一条',
-      '可以上传自己的头像了：第一次起昵称时上传，或者在战报卡上点“换头像”；排行榜和留言墙都会显示',
-      '顶部给张楷换照片的按钮改名叫“皮肤”'
+      '可以上传自己的头像了：打开“排行”或“留言”，在最上面点“上传头像”；排行榜和留言墙都会显示'
     ]
   },
   {
@@ -2545,7 +2396,7 @@ const ANNOUNCEMENTS = [
       '第一次打开先起个昵称，全班唯一，成绩自动进排行榜',
       '排行榜加了防刷分检查，明显伪造的成绩会被拒绝',
       '网络不好上传失败时，成绩先存在手机里，联网后自动补传',
-      '修了一批问题：打开“皮肤”设置或看排行榜时游戏会暂停；看完庆祝画面不会再立刻判负；苹果手机切回来后有声音了'
+      '修了一批问题：看排行榜时游戏会暂停；看完庆祝画面不会再立刻判负；苹果手机切回来后有声音了'
     ]
   },
   {
@@ -2749,7 +2600,6 @@ function bindGuestbook() {
 
 
 
-
 function renderSoundBtn() {
   const muted = isMuted();
   $('btn-sound').textContent = muted ? '开声' : '静音';
@@ -2773,7 +2623,6 @@ function bindButtons() {
   $('btn-copy').addEventListener('click', copyShare);
   $('btn-continue').addEventListener('click', () => { $('win').hidden = true; state.paused = false; });
   $('btn-sound').addEventListener('click', () => { toggleMuted(); renderSoundBtn(); });
-  bindSettings({ onRename: updateHud, onChanged: startGame });
   bindRankboard();
   bindWelcome();
   bindNotice();

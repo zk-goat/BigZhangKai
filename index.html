@@ -10,7 +10,6 @@
 <div class="top">
   <h1>合成大张楷</h1>
   <div class="btns">
-    <button id="btn-set" type="button">皮肤</button>
     <button id="btn-restart" type="button">重开</button>
     <button id="btn-sound" type="button" aria-pressed="true">静音</button>
     <button id="btn-rank" type="button" hidden>排行</button>
@@ -25,19 +24,6 @@
 </div>
 <div class="stage"><canvas id="game" aria-label="游戏画布"></canvas></div>
 <div class="ladder" id="ladder"></div>
-
-<div class="overlay" id="settings" hidden>
-  <div class="card">
-    <h2>定制每一级张楷</h2>
-    <p>给每个等级上传一张抠好图的透明 PNG，他的脑袋轮廓就是碰撞形状；没抠的照片会变成方块。改完点“完成”会重开一局。照片只存在这台设备的浏览器里，不会上传。</p>
-    <div class="rows" id="rows"></div>
-    <div class="actions">
-      <label class="up" style="border:2px solid var(--ink);border-radius:999px;padding:4px 12px;cursor:pointer;font-size:.85rem">一张照片用到全部<input id="up-all" class="sr-only" type="file" accept="image/*"></label>
-      <button id="btn-reset-skin" type="button">恢复默认</button>
-      <button id="btn-close" type="button">完成</button>
-    </div>
-  </div>
-</div>
 
 <div class="overlay" id="win" hidden>
   <div class="card" style="align-items:center;text-align:center">

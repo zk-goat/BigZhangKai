@@ -1,7 +1,7 @@
 // 全班排行榜的数据接口（Supabase RPC，见 supabase/002_unique_names.sql）。只负责读写数据，不碰页面。
 // 每台设备一个随机身份码：昵称第一次被谁占用就归谁，成绩也只能用自己的身份码提交。
 import { LEADERBOARD, MAX, STORAGE_KEYS } from './config.js?v=19e16d6c';
-import { store } from './skin.js?v=c519b08c';
+import { store } from './skin.js?v=db8d0fbb';
 
 const TIMEOUT_MS = 12000;
 const NETWORK_RETRIES = 1;

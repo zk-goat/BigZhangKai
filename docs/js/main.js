@@ -1,17 +1,16 @@
 // 启动：加载照片 → 开局 → 绑定按钮。链接带 ?test=win / ?test=over（可加 &score=分数）时直接展示庆祝画面 / 示例战报。
 import { FIELD, MAX } from './config.js?v=19e16d6c';
-import { initSkin } from './skin.js?v=c519b08c';
-import { isMuted, toggleMuted } from './audio.js?v=94891e2a';
-import { state } from './state.js?v=6ff1b6c5';
-import { copyShare, gameOver } from './report.js?v=002aadb8';
-import { startGame, restoreGame, loop, fit, bindInput, makeKai, updateHud, debugSnapshot, simulateGames } from './game.js?v=cfa3dfc8';
-import { readSave } from './save.js?v=b4a0a97a';
-import { bindSettings } from './settings.js?v=0670365c';
-import { bindRankboard, flushPending } from './rankboard.js?v=df02cc45';
-import { bindWelcome, showWelcomeIfNeeded, needsWelcome } from './welcome.js?v=5b98a006';
-import { bindNotice, showNoticeIfNew } from './notice.js?v=7ebc4bf3';
-import { bindGuestbook } from './guestbook.js?v=17eac99a';
-import { syncMyAvatar } from './profile.js?v=300d68e0';
+import { initSkin } from './skin.js?v=db8d0fbb';
+import { isMuted, toggleMuted } from './audio.js?v=fcec154b';
+import { state } from './state.js?v=a3d7fb92';
+import { copyShare, gameOver } from './report.js?v=3703e5f7';
+import { startGame, restoreGame, loop, fit, bindInput, makeKai, debugSnapshot, simulateGames } from './game.js?v=147221a0';
+import { readSave } from './save.js?v=77a1c0bb';
+import { bindRankboard, flushPending } from './rankboard.js?v=a9b1a572';
+import { bindWelcome, showWelcomeIfNeeded, needsWelcome } from './welcome.js?v=77e2c1e7';
+import { bindNotice, showNoticeIfNew } from './notice.js?v=b7aa98b6';
+import { bindGuestbook } from './guestbook.js?v=32350e9f';
+import { syncMyAvatar } from './profile.js?v=22b20b08';
 import { $ } from './dom.js?v=5b57db68';
 
 function renderSoundBtn() {
@@ -37,7 +36,6 @@ function bindButtons() {
   $('btn-copy').addEventListener('click', copyShare);
   $('btn-continue').addEventListener('click', () => { $('win').hidden = true; state.paused = false; });
   $('btn-sound').addEventListener('click', () => { toggleMuted(); renderSoundBtn(); });
-  bindSettings({ onRename: updateHud, onChanged: startGame });
   bindRankboard();
   bindWelcome();
   bindNotice();

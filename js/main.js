@@ -4,9 +4,8 @@ import { initSkin } from './skin.js';
 import { isMuted, toggleMuted } from './audio.js';
 import { state } from './state.js';
 import { copyShare, gameOver } from './report.js';
-import { startGame, restoreGame, loop, fit, bindInput, makeKai, updateHud, debugSnapshot, simulateGames } from './game.js';
+import { startGame, restoreGame, loop, fit, bindInput, makeKai, debugSnapshot, simulateGames } from './game.js';
 import { readSave } from './save.js';
-import { bindSettings } from './settings.js';
 import { bindRankboard, flushPending } from './rankboard.js';
 import { bindWelcome, showWelcomeIfNeeded, needsWelcome } from './welcome.js';
 import { bindNotice, showNoticeIfNew } from './notice.js';
@@ -37,7 +36,6 @@ function bindButtons() {
   $('btn-copy').addEventListener('click', copyShare);
   $('btn-continue').addEventListener('click', () => { $('win').hidden = true; state.paused = false; });
   $('btn-sound').addEventListener('click', () => { toggleMuted(); renderSoundBtn(); });
-  bindSettings({ onRename: updateHud, onChanged: startGame });
   bindRankboard();
   bindWelcome();
   bindNotice();
