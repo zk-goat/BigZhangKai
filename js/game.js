@@ -7,6 +7,7 @@ import { sfx, unlockAudio } from './audio.js';
 import { state, resetRound, addScore } from './state.js';
 import { resetEffects, mergeEffects, applyShake, drawEffects } from './effects.js';
 import { showWin, gameOver } from './report.js';
+import { writeSave, clearSave } from './save.js';
 
 const { Engine, Bodies, Composite, Events, Body } = Matter;
 const W = FIELD.width, H = FIELD.height;
@@ -146,13 +147,51 @@ export function updateHud() {
   }));
 }
 
-export function startGame() {
+function enterRound(engine) {
   clearTimeout(cooldownTimer);
-  resetRound(newEngine(), 0);
-  state.next = randLevel();
+  resetRound(engine, 0);
   resetEffects();
   document.getElementById('win').hidden = true;
   document.getElementById('over').hidden = true;
+}
+
+export function startGame() {
+  enterRound(newEngine());
+  state.next = randLevel();
+  clearSave();
+  updateHud();
+}
+
+// ---------- 存档 ----------
+const AUTOSAVE_MS = 2000;
+let lastSaveAt = 0;
+
+function snapshotGame() {
+  return {
+    bodies: kaiBodies().filter(b => !b.merged).map(b => ({
+      lv: b.kaiLevel, x: Math.round(b.position.x * 10) / 10, y: Math.round(b.position.y * 10) / 10,
+      angle: Math.round(b.angle * 1000) / 1000
+    })),
+    state: {
+      score: state.score, topLevel: state.topLevel, current: state.current, next: state.next,
+      mergeCount: state.mergeCount, maxCombo: state.maxCombo, wonThisGame: state.wonThisGame,
+      playedMs: Date.now() - state.startedAt
+    }
+  };
+}
+
+export function saveNow() {
+  if (!state.engine || state.over) return;
+  writeSave(snapshotGame());
+  lastSaveAt = performance.now();
+}
+
+// 按存档摆回每个张楷；刚恢复的张楷重新享受越线缓冲，不会一打开就判负
+export function restoreGame(save) {
+  enterRound(newEngine());
+  const { playedMs, wonThisGame, ...rest } = save.state;
+  Object.assign(state, rest, { wonThisGame, startedAt: Date.now() - playedMs });
+  save.bodies.forEach(({ lv, x, y, angle }) => Body.setAngle(makeKai(x, y, lv), angle));
   updateHud();
 }
 
@@ -207,6 +246,7 @@ export function loop(now) {
     acc = 0;
     state.dangerSince = 0;  // 暂停期间不计越线时间，恢复后重新数 2 秒
   }
+  if (!state.over && now - lastSaveAt > AUTOSAVE_MS) saveNow();
   draw(now);
   requestAnimationFrame(loop);
 }
@@ -243,7 +283,17 @@ export function bindInput() {
   });
   window.addEventListener('resize', fit);
   canvas.addEventListener('contextrestored', fit);
+  let hiddenAt = 0;
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) { state.dangerSince = 0; fit(); }
+    if (document.hidden) {
+      saveNow();
+      hiddenAt = Date.now();
+    } else {
+      if (hiddenAt && !state.over) state.startedAt += Date.now() - hiddenAt;
+      hiddenAt = 0;
+      state.dangerSince = 0;
+      fit();
+    }
   });
+  window.addEventListener('pagehide', saveNow);
 }

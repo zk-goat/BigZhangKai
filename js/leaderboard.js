@@ -62,7 +62,6 @@ async function rpcOnce(fn, args) {
   }
 }
 
-// 去掉首尾空白和控制字符，截到允许的长度
 // 去掉首尾空白、控制字符和零宽/方向控制等不可见字符，全角半角统一（与数据库端一致），截到允许长度
 export function cleanName(raw) {
   const s = String(raw || '').normalize('NFKC').replace(/[\p{Cc}\p{Cf}]/gu, '').trim();

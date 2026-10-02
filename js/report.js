@@ -5,6 +5,7 @@ import { paintLevel } from './draw.js';
 import { sfx } from './audio.js';
 import { state } from './state.js';
 import { onRoundOver } from './rankboard.js';
+import { clearSave } from './save.js';
 import { $ } from './dom.js';
 
 const BOARD_SIZE = 5;
@@ -74,6 +75,7 @@ let shareText = '';
 export function gameOver() {
   const { score, topLevel, mergeCount, maxCombo, startedAt, wonThisGame } = state;
   state.over = true;
+  clearSave();
   sfx.over();
 
   const run = { score, lv: topLevel, at: Date.now() };

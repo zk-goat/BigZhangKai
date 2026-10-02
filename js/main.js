@@ -4,7 +4,8 @@ import { initSkin } from './skin.js';
 import { isMuted, toggleMuted } from './audio.js';
 import { state } from './state.js';
 import { copyShare, gameOver } from './report.js';
-import { startGame, loop, fit, bindInput, makeKai, updateHud, debugSnapshot } from './game.js';
+import { startGame, restoreGame, loop, fit, bindInput, makeKai, updateHud, debugSnapshot } from './game.js';
+import { readSave } from './save.js';
 import { bindSettings } from './settings.js';
 import { bindRankboard, flushPending } from './rankboard.js';
 import { $ } from './dom.js';
@@ -15,7 +16,18 @@ function renderSoundBtn() {
   $('btn-sound').setAttribute('aria-pressed', String(!muted));
 }
 
+const TOAST_MS = 5000;
+let toastTimer = 0;
+
+function showToast(text) {
+  $('toast-text').textContent = text;
+  $('toast').hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { $('toast').hidden = true; }, TOAST_MS);
+}
+
 function bindButtons() {
+  $('btn-toast-restart').addEventListener('click', () => { $('toast').hidden = true; startGame(); });
   $('btn-restart').addEventListener('click', startGame);
   $('btn-again').addEventListener('click', startGame);
   $('btn-copy').addEventListener('click', copyShare);
@@ -47,7 +59,14 @@ async function boot() {
   bindInput();
   bindButtons();
   await initSkin();
-  startGame();
+  // 有上一局的存档就接着玩（测试链接不恢复，免得干扰）
+  const saved = /[?&]test=/.test(location.search) ? null : readSave();
+  if (saved) {
+    restoreGame(saved);
+    showToast(`已恢复上一局（${saved.state.score} 分）`);
+  } else {
+    startGame();
+  }
   requestAnimationFrame(loop);
   runTestHooks();
   flushPending();

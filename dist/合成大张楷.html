@@ -173,6 +173,15 @@ canvas {
 .upload-auto b { color: var(--ink); }
 .upload-msg .linkish { color: var(--accent); font-size: inherit; }
 #upload-ask { display: grid; gap: 6px; }
+
+/* 恢复存档提示 */
+.toast {
+  position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 64px); transform: translateX(-50%);
+  z-index: 4; display: flex; align-items: center; gap: 10px; white-space: nowrap;
+  background: var(--ink); color: var(--panel); padding: 6px 8px 6px 14px; border-radius: 999px;
+  font-size: .85rem; box-shadow: 0 4px 14px rgba(59,42,20,.3);
+}
+.toast button { font-size: .8rem; padding: 2px 10px; background: var(--panel); color: var(--ink); border-color: var(--panel); }
 </style>
 </head>
 <body>
@@ -185,6 +194,10 @@ canvas {
     <button id="btn-rank" type="button" hidden>排行榜</button>
   </div>
   <div class="score"><span id="score">0</span><small>最高 <span id="best">0</span></small></div>
+</div>
+<div class="toast" id="toast" role="status" hidden>
+  <span id="toast-text">已恢复上一局</span>
+  <button id="btn-toast-restart" type="button">重新开始</button>
 </div>
 <div class="stage"><canvas id="game" aria-label="游戏画布"></canvas></div>
 <div class="ladder" id="ladder"></div>
@@ -360,7 +373,8 @@ const STORAGE_KEYS = {
   playerName: 'dazhangkai-name',
   playerToken: 'dazhangkai-player-token',
   uploadedBest: 'dazhangkai-uploaded-best',
-  pendingRun: 'dazhangkai-pending-run'
+  pendingRun: 'dazhangkai-pending-run',
+  save: 'dazhangkai-save-v1'
 };
 
 const SHARE_URL = 'zk-goat.github.io/BigZhangKai';
@@ -800,7 +814,6 @@ async function rpcOnce(fn, args) {
   }
 }
 
-// 去掉首尾空白和控制字符，截到允许的长度
 // 去掉首尾空白、控制字符和零宽/方向控制等不可见字符，全角半角统一（与数据库端一致），截到允许长度
 function cleanName(raw) {
   const s = String(raw || '').normalize('NFKC').replace(/[\p{Cc}\p{Cf}]/gu, '').trim();
@@ -1044,8 +1057,46 @@ function bindRankboard() {
   $('btn-upload-board').addEventListener('click', openBoard);
 }
 
+// ---- save.js ----
+// 一局进行中的存档：场上每个张楷 + 本局状态。退出再进来能接着玩。
+// 只存在本机；游戏结束或主动重开时清空。
+
+
+const SAVE_VERSION = 1;
+const MAX_BODIES = 400;
+
+const isNum = v => typeof v === 'number' && Number.isFinite(v);
+const isLevel = v => Number.isInteger(v) && v >= 0 && v <= MAX;
+
+// snapshot：{ bodies: [{lv, x, y, angle}], state: {...} }，由 game.js 生成
+function writeSave(snapshot) {
+  store.set(STORAGE_KEYS.save, JSON.stringify({ v: SAVE_VERSION, at: Date.now(), ...snapshot }));
+}
+
+function clearSave() {
+  store.set(STORAGE_KEYS.save, 'null');
+}
+
+// 读存档并逐项校验；格式不对就当没有存档
+function readSave() {
+  try {
+    const s = JSON.parse(store.get(STORAGE_KEYS.save) || 'null');
+    if (!s || s.v !== SAVE_VERSION || !Array.isArray(s.bodies) || !s.state) return null;
+    const bodies = s.bodies.filter(b =>
+      b && isLevel(b.lv) && isNum(b.x) && isNum(b.y) && isNum(b.angle)
+      && b.x >= 0 && b.x <= FIELD.width && b.y <= FIELD.height).slice(0, MAX_BODIES);
+    const st = s.state;
+    const fields = ['score', 'topLevel', 'current', 'next', 'mergeCount', 'maxCombo', 'playedMs'];
+    if (!fields.every(k => isNum(st[k]) && st[k] >= 0)) return null;
+    if (![st.topLevel, st.current, st.next].every(isLevel)) return null;
+    if (bodies.length === 0 && st.score === 0) return null;  // 刚开局什么都没有，不值得恢复
+    return { bodies, state: { ...st, wonThisGame: Boolean(st.wonThisGame) } };
+  } catch { return null; }
+}
+
 // ---- report.js ----
 // 结算：战报卡、本机前 5、复制战绩，以及合出大张楷时的庆祝画面。
+
 
 
 
@@ -1120,6 +1171,7 @@ let shareText = '';
 function gameOver() {
   const { score, topLevel, mergeCount, maxCombo, startedAt, wonThisGame } = state;
   state.over = true;
+  clearSave();
   sfx.over();
 
   const run = { score, lv: topLevel, at: Date.now() };
@@ -1256,6 +1308,7 @@ function drawEffects(ctx, now) {
 
 // ---- game.js ----
 // 游戏本体：物理世界、投放、合成、判负、主循环、画面适配和输入。
+
 
 
 
@@ -1402,13 +1455,51 @@ function updateHud() {
   }));
 }
 
-function startGame() {
+function enterRound(engine) {
   clearTimeout(cooldownTimer);
-  resetRound(newEngine(), 0);
-  state.next = randLevel();
+  resetRound(engine, 0);
   resetEffects();
   document.getElementById('win').hidden = true;
   document.getElementById('over').hidden = true;
+}
+
+function startGame() {
+  enterRound(newEngine());
+  state.next = randLevel();
+  clearSave();
+  updateHud();
+}
+
+// ---------- 存档 ----------
+const AUTOSAVE_MS = 2000;
+let lastSaveAt = 0;
+
+function snapshotGame() {
+  return {
+    bodies: kaiBodies().filter(b => !b.merged).map(b => ({
+      lv: b.kaiLevel, x: Math.round(b.position.x * 10) / 10, y: Math.round(b.position.y * 10) / 10,
+      angle: Math.round(b.angle * 1000) / 1000
+    })),
+    state: {
+      score: state.score, topLevel: state.topLevel, current: state.current, next: state.next,
+      mergeCount: state.mergeCount, maxCombo: state.maxCombo, wonThisGame: state.wonThisGame,
+      playedMs: Date.now() - state.startedAt
+    }
+  };
+}
+
+function saveNow() {
+  if (!state.engine || state.over) return;
+  writeSave(snapshotGame());
+  lastSaveAt = performance.now();
+}
+
+// 按存档摆回每个张楷；刚恢复的张楷重新享受越线缓冲，不会一打开就判负
+function restoreGame(save) {
+  enterRound(newEngine());
+  const { playedMs, wonThisGame, ...rest } = save.state;
+  Object.assign(state, rest, { wonThisGame, startedAt: Date.now() - playedMs });
+  save.bodies.forEach(({ lv, x, y, angle }) => Body.setAngle(makeKai(x, y, lv), angle));
   updateHud();
 }
 
@@ -1463,6 +1554,7 @@ function loop(now) {
     acc = 0;
     state.dangerSince = 0;  // 暂停期间不计越线时间，恢复后重新数 2 秒
   }
+  if (!state.over && now - lastSaveAt > AUTOSAVE_MS) saveNow();
   draw(now);
   requestAnimationFrame(loop);
 }
@@ -1499,9 +1591,19 @@ function bindInput() {
   });
   window.addEventListener('resize', fit);
   canvas.addEventListener('contextrestored', fit);
+  let hiddenAt = 0;
   document.addEventListener('visibilitychange', () => {
-    if (!document.hidden) { state.dangerSince = 0; fit(); }
+    if (document.hidden) {
+      saveNow();
+      hiddenAt = Date.now();
+    } else {
+      if (hiddenAt && !state.over) state.startedAt += Date.now() - hiddenAt;
+      hiddenAt = 0;
+      state.dangerSince = 0;
+      fit();
+    }
   });
+  window.addEventListener('pagehide', saveNow);
 }
 
 // ---- settings.js ----
@@ -1605,13 +1707,25 @@ function bindSettings({ onRename, onChanged }) {
 
 
 
+
 function renderSoundBtn() {
   const muted = isMuted();
   $('btn-sound').textContent = muted ? '开声音' : '静音';
   $('btn-sound').setAttribute('aria-pressed', String(!muted));
 }
 
+const TOAST_MS = 5000;
+let toastTimer = 0;
+
+function showToast(text) {
+  $('toast-text').textContent = text;
+  $('toast').hidden = false;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { $('toast').hidden = true; }, TOAST_MS);
+}
+
 function bindButtons() {
+  $('btn-toast-restart').addEventListener('click', () => { $('toast').hidden = true; startGame(); });
   $('btn-restart').addEventListener('click', startGame);
   $('btn-again').addEventListener('click', startGame);
   $('btn-copy').addEventListener('click', copyShare);
@@ -1643,7 +1757,14 @@ async function boot() {
   bindInput();
   bindButtons();
   await initSkin();
-  startGame();
+  // 有上一局的存档就接着玩（测试链接不恢复，免得干扰）
+  const saved = /[?&]test=/.test(location.search) ? null : readSave();
+  if (saved) {
+    restoreGame(saved);
+    showToast(`已恢复上一局（${saved.state.score} 分）`);
+  } else {
+    startGame();
+  }
   requestAnimationFrame(loop);
   runTestHooks();
   flushPending();
