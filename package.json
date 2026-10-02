@@ -1,0 +1,9 @@
+{
+  "name": "big-zhangkai",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "build": "python tools/bundle.py"
+  }
+}
