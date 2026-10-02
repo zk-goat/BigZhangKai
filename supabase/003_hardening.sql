@@ -54,9 +54,9 @@ begin
   if v_id is null then return null; end if;
 
   -- 合理性检查（与游戏规则对应：每 0.45 秒最多投一个；每次合成净减少一个张楷；
-  -- 只会掉前 5 级，合到第 L 级（从 0 数）至少要 2^(L-4)-1 次合成；单次合成得分不会超过约 80）
+  -- 只会掉前 5 级，合到第 L 级（从 0 数）至少要 2^(L-4)-1 次合成；平均每次合成得分实测二三十，上限取 60）
   if p_merges > p_duration * 2.5 + 5
-     or p_score > p_merges * 80 + 300
+     or p_score > p_merges * 60 + 300
      or (p_top_level > 4 and p_merges < power(2, p_top_level - 4) - 1) then
     raise exception 'rejected: implausible score';
   end if;
