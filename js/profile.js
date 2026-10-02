@@ -2,6 +2,7 @@
 import { STORAGE_KEYS } from './config.js';
 import { store } from './skin.js';
 import { setAvatar, myProfile, claimName } from './leaderboard.js';
+import { avatarEl, makeAvatar } from './avatar.js';
 
 export const myAvatar = () => store.get(STORAGE_KEYS.avatar) || '';
 
@@ -22,4 +23,35 @@ export async function syncMyAvatar() {
     if (p && p.avatar && !myAvatar()) store.set(STORAGE_KEYS.avatar, p.avatar);
     else if (p && !p.avatar && myAvatar()) await setAvatar(myAvatar());
   } catch { /* 连不上就下次再说 */ }
+}
+
+// 头像 + 昵称 + 换头像，排行榜和留言墙共用；onChanged 在换完头像后调用（比如刷新列表）
+export function renderMeBar(el, { size = 28, onChanged } = {}) {
+  const name = store.get(STORAGE_KEYS.playerName) || '';
+  el.hidden = !name;
+  if (!name) return;
+  const nm = document.createElement('b');
+  nm.textContent = name;
+  // 文件框不能用 display:none 藏起来，苹果手机上点了会没反应，所以用视觉隐藏
+  const pick = document.createElement('label');
+  pick.className = 'linkish me-pick';
+  pick.append(document.createTextNode(myAvatar() ? '换头像' : '上传头像'));
+  const input = document.createElement('input');
+  Object.assign(input, { type: 'file', accept: 'image/*', className: 'sr-only' });
+  pick.append(input);
+  const msg = document.createElement('span');
+  msg.className = 'me-msg';
+  input.addEventListener('change', async () => {
+    const file = input.files[0];
+    if (!file) return;
+    msg.textContent = '上传中…';
+    try {
+      await uploadAvatar(await makeAvatar(file));
+      renderMeBar(el, { size, onChanged });
+      if (onChanged) onChanged();
+    } catch (err) {
+      msg.textContent = err.message;
+    }
+  });
+  el.replaceChildren(avatarEl(name, myAvatar(), size), nm, pick, msg);
 }

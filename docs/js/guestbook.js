@@ -5,6 +5,7 @@ import { state } from './state.js?v=6ff1b6c5';
 import { $ } from './dom.js?v=5b57db68';
 import { leaderboardEnabled, postMessage, listMessages, claimName, MESSAGES_PAGE } from './leaderboard.js?v=274d39d7';
 import { avatarEl } from './avatar.js?v=950f7d8a';
+import { renderMeBar } from './profile.js?v=300d68e0';
 
 const MAX_LEN = 200;
 let oldestId = null;
@@ -95,7 +96,7 @@ function openBook() {
   pausedByBook = !state.over && !state.paused;
   if (pausedByBook) state.paused = true;
   $('book-msg').textContent = '';
-  $('book-who').textContent = myName() ? `署名：${myName()}` : '还没有昵称';
+  renderMeBar($('book-who'), { size: 22, onChanged: () => { oldestId = null; loadMessages(); } });
   $('guestbook').hidden = false;
   oldestId = null;
   loadMessages();

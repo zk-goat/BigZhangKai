@@ -5,6 +5,7 @@ import { state } from './state.js';
 import { $ } from './dom.js';
 import { leaderboardEnabled, postMessage, listMessages, claimName, MESSAGES_PAGE } from './leaderboard.js';
 import { avatarEl } from './avatar.js';
+import { renderMeBar } from './profile.js';
 
 const MAX_LEN = 200;
 let oldestId = null;
@@ -95,7 +96,7 @@ function openBook() {
   pausedByBook = !state.over && !state.paused;
   if (pausedByBook) state.paused = true;
   $('book-msg').textContent = '';
-  $('book-who').textContent = myName() ? `署名：${myName()}` : '还没有昵称';
+  renderMeBar($('book-who'), { size: 22, onChanged: () => { oldestId = null; loadMessages(); } });
   $('guestbook').hidden = false;
   oldestId = null;
   loadMessages();

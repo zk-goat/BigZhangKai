@@ -32,7 +32,7 @@
     <p>给每个等级上传一张抠好图的透明 PNG，他的脑袋轮廓就是碰撞形状；没抠的照片会变成方块。改完点“完成”会重开一局。照片只存在这台设备的浏览器里，不会上传。</p>
     <div class="rows" id="rows"></div>
     <div class="actions">
-      <label class="up" style="border:2px solid var(--ink);border-radius:999px;padding:4px 12px;cursor:pointer;font-size:.85rem">一张照片用到全部<input id="up-all" type="file" accept="image/*" hidden></label>
+      <label class="up" style="border:2px solid var(--ink);border-radius:999px;padding:4px 12px;cursor:pointer;font-size:.85rem">一张照片用到全部<input id="up-all" class="sr-only" type="file" accept="image/*"></label>
       <button id="btn-reset-skin" type="button">恢复默认</button>
       <button id="btn-close" type="button">完成</button>
     </div>
@@ -57,7 +57,7 @@
       <span id="welcome-avatar-preview"></span>
       <span class="welcome-avatar-tip" id="welcome-avatar-tip">点这里上传头像（可选）</span>
     </label>
-    <input id="welcome-avatar" type="file" accept="image/*" hidden>
+    <input id="welcome-avatar" class="sr-only" type="file" accept="image/*">
     <label class="sr-only" for="welcome-name">昵称</label>
     <input id="welcome-name" type="text" maxlength="12" placeholder="你的昵称（最多 12 个字）" autocomplete="nickname">
     <button id="btn-welcome" type="button">开始玩</button>
@@ -72,7 +72,7 @@
       <label class="sr-only" for="book-input">留言内容</label>
       <textarea id="book-input" rows="3" maxlength="400" placeholder="想对张楷说点什么？（所有人都能看到）"></textarea>
       <div class="book-row">
-        <span class="book-who" id="book-who"></span>
+        <span class="book-who me-bar" id="book-who"></span>
         <span class="book-count" id="book-count">0/200</span>
         <button id="book-send" type="button">发送</button>
       </div>
@@ -96,6 +96,7 @@
 <div class="overlay" id="rank" hidden>
   <div class="card rank-card">
     <h2>全班排行榜</h2>
+    <div class="me-bar" id="rank-me" hidden></div>
     <ol class="rank-list" id="rank-list"></ol>
     <p class="rank-msg" id="rank-msg" role="status"></p>
     <div class="actions">
@@ -145,7 +146,7 @@
           <span class="me-line"><span id="player-avatar"></span><b id="player-label"></b></span>
           <span class="me-actions">
             <label class="linkish" for="report-avatar">换头像</label>
-            <input id="report-avatar" type="file" accept="image/*" hidden>
+            <input id="report-avatar" class="sr-only" type="file" accept="image/*">
             <button class="linkish" id="btn-rename" type="button">改昵称</button>
           </span>
         </div>

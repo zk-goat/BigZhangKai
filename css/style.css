@@ -81,7 +81,8 @@ canvas {
   padding: 4px 8px; border: 2px solid var(--line); border-radius: 8px; background: #fff; color: var(--ink);
 }
 .row label.up { font-size: .8rem; border: 2px solid var(--ink); border-radius: 999px; padding: 3px 10px; cursor: pointer; white-space: nowrap; }
-.row label.up input { display: none; }
+.row label.up input { position: absolute; width: 1px; height: 1px; opacity: 0; overflow: hidden; }
+.row label.up { position: relative; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
 .card .big { font-family: var(--display); font-size: 3rem; color: var(--accent); text-align: center; margin: 0; line-height: 1; }
 .badge {
@@ -267,3 +268,11 @@ label.linkish { cursor: pointer; }
 .welcome-avatar { display: grid; justify-items: center; gap: 4px; cursor: pointer; }
 .welcome-avatar-tip { font-size: .8rem; color: var(--muted); text-decoration: underline; }
 .upload .me-actions .linkish { font-family: var(--body); font-size: .8rem; font-weight: 400; color: var(--muted); }
+
+/* “我”栏：头像 + 昵称 + 换头像 */
+.me-bar { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.me-bar b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+.me-bar .me-pick { font-family: var(--body); font-size: .8rem; font-weight: 400; color: var(--muted); white-space: nowrap; position: relative; }
+.me-msg { font-size: .75rem; color: var(--accent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#rank-me { padding: 8px 10px; border-radius: 12px; background: rgba(226,73,47,.08); }
+.book-who.me-bar { font-size: .85rem; }

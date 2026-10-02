@@ -6,7 +6,7 @@ import { state } from './state.js';
 import { $ } from './dom.js';
 import { leaderboardEnabled, fetchTop, submitScore, claimName, cleanName, canPersist } from './leaderboard.js';
 import { avatarEl, makeAvatar } from './avatar.js';
-import { myAvatar, uploadAvatar } from './profile.js';
+import { myAvatar, uploadAvatar, renderMeBar } from './profile.js';
 
 const playerName = () => store.get(STORAGE_KEYS.playerName) || '';
 const uploadedBest = () => Number(store.get(STORAGE_KEYS.uploadedBest)) || 0;
@@ -79,6 +79,7 @@ function openBoard() {
   pausedByBoard = !state.over && !state.paused;
   if (pausedByBoard) state.paused = true;
   $('rank').hidden = false;
+  renderMeBar($('rank-me'), { size: 30, onChanged: loadRanking });
   loadRanking();
 }
 

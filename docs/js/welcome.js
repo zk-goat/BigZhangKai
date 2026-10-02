@@ -7,7 +7,7 @@ import { state } from './state.js?v=6ff1b6c5';
 import { $ } from './dom.js?v=5b57db68';
 import { leaderboardEnabled, claimName, cleanName, canPersist } from './leaderboard.js?v=274d39d7';
 import { makeAvatar, avatarEl } from './avatar.js?v=950f7d8a';
-import { uploadAvatar } from './profile.js?v=6b30b260';
+import { uploadAvatar } from './profile.js?v=300d68e0';
 
 export const needsWelcome = () => leaderboardEnabled() && !store.get(STORAGE_KEYS.playerName);
 
