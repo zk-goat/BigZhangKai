@@ -249,3 +249,21 @@ canvas {
 .msg-body { margin: 4px 0 0; font-size: .92rem !important; color: var(--ink) !important; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 .book-status { text-align: center; font-size: .85rem; }
 .book-more { justify-self: center; }
+
+/* 个人头像 */
+.avatar {
+  display: inline-grid; place-items: center; flex: none; border-radius: 50%; overflow: hidden;
+  color: #fff; font-weight: 700; line-height: 1; vertical-align: middle;
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px rgba(59,42,20,.25);
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rank-list li { grid-template-columns: 2em 32px 1fr auto; }
+.msg-head { justify-content: flex-start; }
+.msg-head span:last-child { margin-left: auto; }
+.me-line { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.me-line b { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.me-actions { display: inline-flex; gap: 10px; align-items: baseline; white-space: nowrap; }
+label.linkish { cursor: pointer; }
+.welcome-avatar { display: grid; justify-items: center; gap: 4px; cursor: pointer; }
+.welcome-avatar-tip { font-size: .8rem; color: var(--muted); text-decoration: underline; }
+.upload .me-actions .linkish { font-family: var(--body); font-size: .8rem; font-weight: 400; color: var(--muted); }

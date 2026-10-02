@@ -1,9 +1,10 @@
 // 给张楷的留言墙：所有人都能看，署名用游戏昵称。打开时游戏暂停。
-import { STORAGE_KEYS } from './config.js?v=10014806';
-import { store } from './skin.js?v=78f85177';
-import { state } from './state.js?v=f33ab52c';
+import { STORAGE_KEYS } from './config.js?v=19e16d6c';
+import { store } from './skin.js?v=c519b08c';
+import { state } from './state.js?v=6ff1b6c5';
 import { $ } from './dom.js?v=5b57db68';
-import { leaderboardEnabled, postMessage, listMessages, claimName, MESSAGES_PAGE } from './leaderboard.js?v=845d1ba6';
+import { leaderboardEnabled, postMessage, listMessages, claimName, MESSAGES_PAGE } from './leaderboard.js?v=274d39d7';
+import { avatarEl } from './avatar.js?v=950f7d8a';
 
 const MAX_LEN = 200;
 let oldestId = null;
@@ -28,7 +29,7 @@ function messageItem(m) {
   const head = document.createElement('div'); head.className = 'msg-head';
   const who = document.createElement('b'); who.textContent = m.name;
   const when = document.createElement('span'); when.textContent = timeAgo(m.created_at);
-  head.append(who, when);
+  head.append(avatarEl(m.name, m.avatar, 26), who, when);
   const body = document.createElement('p'); body.className = 'msg-body';
   body.textContent = m.content;  // 用 textContent，留言里的任何内容都只当文字显示
   li.append(head, body);

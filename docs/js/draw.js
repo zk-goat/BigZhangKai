@@ -1,6 +1,6 @@
 // 画一个张楷：有照片画照片轮廓，没照片画一个带表情的彩色圆球。
-import { LEVELS, MAX, COLORS } from './config.js?v=10014806';
-import { skin, photoImg, shapeFor } from './skin.js?v=78f85177';
+import { LEVELS, MAX, COLORS } from './config.js?v=19e16d6c';
+import { skin, photoImg, shapeFor } from './skin.js?v=c519b08c';
 import { drawGoldPhoto, drawTwinkle, drawGoldRing } from './shine.js?v=8bbb7766';
 
 const NAME_MIN_R = 40;  // 半径小于它不写名字

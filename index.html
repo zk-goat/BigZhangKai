@@ -10,7 +10,7 @@
 <div class="top">
   <h1>合成大张楷</h1>
   <div class="btns">
-    <button id="btn-set" type="button">头像</button>
+    <button id="btn-set" type="button">皮肤</button>
     <button id="btn-restart" type="button">重开</button>
     <button id="btn-sound" type="button" aria-pressed="true">静音</button>
     <button id="btn-rank" type="button" hidden>排行</button>
@@ -53,6 +53,11 @@
     <canvas id="welcome-pic" width="320" height="320" aria-hidden="true"></canvas>
     <h2>合成大张楷</h2>
     <p>从推眼镜楷一路合成到捧金球的大张楷。起个昵称，成绩会自动进全班排行榜。</p>
+    <label class="welcome-avatar" for="welcome-avatar">
+      <span id="welcome-avatar-preview"></span>
+      <span class="welcome-avatar-tip" id="welcome-avatar-tip">点这里上传头像（可选）</span>
+    </label>
+    <input id="welcome-avatar" type="file" accept="image/*" hidden>
     <label class="sr-only" for="welcome-name">昵称</label>
     <input id="welcome-name" type="text" maxlength="12" placeholder="你的昵称（最多 12 个字）" autocomplete="nickname">
     <button id="btn-welcome" type="button">开始玩</button>
@@ -137,8 +142,12 @@
           </div>
         </div>
         <div class="upload-auto" id="upload-auto" hidden>
-          <span>全班排行榜 · 昵称 <b id="player-label"></b></span>
-          <button class="linkish" id="btn-rename" type="button">改昵称</button>
+          <span class="me-line"><span id="player-avatar"></span><b id="player-label"></b></span>
+          <span class="me-actions">
+            <label class="linkish" for="report-avatar">换头像</label>
+            <input id="report-avatar" type="file" accept="image/*" hidden>
+            <button class="linkish" id="btn-rename" type="button">改昵称</button>
+          </span>
         </div>
         <p class="upload-msg" id="upload-msg" role="status"></p>
         <button class="linkish" id="btn-upload-board" type="button">看全班排行榜</button>

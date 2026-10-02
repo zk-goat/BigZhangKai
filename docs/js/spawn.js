@@ -1,5 +1,5 @@
 // 掉落：根据本局进度（合到的最高等级）决定下一个掉哪一级。纯函数，可单独测试。
-import { SPAWN } from './config.js?v=10014806';
+import { SPAWN } from './config.js?v=19e16d6c';
 
 // 场上某一级是单数（落单）时给它加的权重，帮它凑对；也让后期不再常规掉落的小张楷还能被清掉
 export const ORPHAN_BOOST = 0.3;

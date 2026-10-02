@@ -95,7 +95,8 @@ export const STORAGE_KEYS = {
   pendingRun: 'dazhangkai-pending-run',
   save: 'dazhangkai-save-v1',
   noticeSeen: 'dazhangkai-notice-seen',
-  dex: 'dazhangkai-shiny-dex'
+  dex: 'dazhangkai-shiny-dex',
+  avatar: 'dazhangkai-avatar'
 };
 
 export const SHARE_URL = 'zk-goat.github.io/BigZhangKai';

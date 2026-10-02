@@ -256,13 +256,31 @@ canvas {
 .msg-body { margin: 4px 0 0; font-size: .92rem !important; color: var(--ink) !important; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; }
 .book-status { text-align: center; font-size: .85rem; }
 .book-more { justify-self: center; }
+
+/* 个人头像 */
+.avatar {
+  display: inline-grid; place-items: center; flex: none; border-radius: 50%; overflow: hidden;
+  color: #fff; font-weight: 700; line-height: 1; vertical-align: middle;
+  box-shadow: 0 0 0 2px var(--panel), 0 0 0 3px rgba(59,42,20,.25);
+}
+.avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.rank-list li { grid-template-columns: 2em 32px 1fr auto; }
+.msg-head { justify-content: flex-start; }
+.msg-head span:last-child { margin-left: auto; }
+.me-line { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+.me-line b { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.me-actions { display: inline-flex; gap: 10px; align-items: baseline; white-space: nowrap; }
+label.linkish { cursor: pointer; }
+.welcome-avatar { display: grid; justify-items: center; gap: 4px; cursor: pointer; }
+.welcome-avatar-tip { font-size: .8rem; color: var(--muted); text-decoration: underline; }
+.upload .me-actions .linkish { font-family: var(--body); font-size: .8rem; font-weight: 400; color: var(--muted); }
 </style>
 </head>
 <body>
 <div class="top">
   <h1>合成大张楷</h1>
   <div class="btns">
-    <button id="btn-set" type="button">头像</button>
+    <button id="btn-set" type="button">皮肤</button>
     <button id="btn-restart" type="button">重开</button>
     <button id="btn-sound" type="button" aria-pressed="true">静音</button>
     <button id="btn-rank" type="button" hidden>排行</button>
@@ -305,6 +323,11 @@ canvas {
     <canvas id="welcome-pic" width="320" height="320" aria-hidden="true"></canvas>
     <h2>合成大张楷</h2>
     <p>从推眼镜楷一路合成到捧金球的大张楷。起个昵称，成绩会自动进全班排行榜。</p>
+    <label class="welcome-avatar" for="welcome-avatar">
+      <span id="welcome-avatar-preview"></span>
+      <span class="welcome-avatar-tip" id="welcome-avatar-tip">点这里上传头像（可选）</span>
+    </label>
+    <input id="welcome-avatar" type="file" accept="image/*" hidden>
     <label class="sr-only" for="welcome-name">昵称</label>
     <input id="welcome-name" type="text" maxlength="12" placeholder="你的昵称（最多 12 个字）" autocomplete="nickname">
     <button id="btn-welcome" type="button">开始玩</button>
@@ -389,8 +412,12 @@ canvas {
           </div>
         </div>
         <div class="upload-auto" id="upload-auto" hidden>
-          <span>全班排行榜 · 昵称 <b id="player-label"></b></span>
-          <button class="linkish" id="btn-rename" type="button">改昵称</button>
+          <span class="me-line"><span id="player-avatar"></span><b id="player-label"></b></span>
+          <span class="me-actions">
+            <label class="linkish" for="report-avatar">换头像</label>
+            <input id="report-avatar" type="file" accept="image/*" hidden>
+            <button class="linkish" id="btn-rename" type="button">改昵称</button>
+          </span>
         </div>
         <p class="upload-msg" id="upload-msg" role="status"></p>
         <button class="linkish" id="btn-upload-board" type="button">看全班排行榜</button>
@@ -513,7 +540,8 @@ const STORAGE_KEYS = {
   pendingRun: 'dazhangkai-pending-run',
   save: 'dazhangkai-save-v1',
   noticeSeen: 'dazhangkai-notice-seen',
-  dex: 'dazhangkai-shiny-dex'
+  dex: 'dazhangkai-shiny-dex',
+  avatar: 'dazhangkai-avatar'
 };
 
 const SHARE_URL = 'zk-goat.github.io/BigZhangKai';
@@ -1085,6 +1113,7 @@ const REASONS = [
   ['daily limit', '今天发得够多了，明天再来'],
   ['invalid content', '留言要写 1～200 个字'],
   ['invalid name', '昵称要 1～12 个字'],
+  ['invalid avatar', '头像图片不符合要求，换一张试试'],
   ['implausible', '这局成绩没通过检查']
 ];
 function friendlyError(status, body) {
@@ -1140,6 +1169,17 @@ async function submitScore({ score, topLevel, merges, durationS }) {
   });
 }
 
+// 设置个人头像（data URL，传 null 删掉）：成功 'ok'；本机还没占过昵称返回 null
+async function setAvatar(avatar) {
+  return rpc('set_avatar', { p_token: playerToken(), p_avatar: avatar });
+}
+
+// 自己的昵称和头像（本机缓存丢了时拿回来）
+async function myProfile() {
+  const rows = await rpc('my_profile', { p_token: playerToken() });
+  return Array.isArray(rows) && rows[0] ? rows[0] : null;
+}
+
 const MESSAGES_PAGE = 30;
 
 // 给张楷留言：成功返回 'ok'；本机还没占过昵称返回 null
@@ -1159,9 +1199,98 @@ async function fetchTop() {
   return Array.isArray(rows) ? rows : [];
 }
 
+// ---- avatar.js ----
+// 个人头像：选好的照片在手机上裁成正方形、压成 96×96 小图；没有头像时显示昵称首字的彩色圆。
+
+const SIZE = 96;
+const MAX_CHARS = 30000;   // 与数据库里的长度限制一致
+const PALETTE = ['#e2492f', '#2e86de', '#10ac84', '#ff9f43', '#8e44ad', '#16a085', '#d35400', '#3fb8af', '#c0392b', '#5a5ad6'];
+
+function readAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onerror = () => reject(new Error('读取图片失败'));
+    fr.onload = () => resolve(fr.result);
+    fr.readAsDataURL(file);
+  });
+}
+
+// 照片 → 正方形小头像 data URL（优先 WebP，不支持的浏览器用 JPEG；太大就降质量）
+async function makeAvatar(file) {
+  let img;
+  try { img = await loadImage(await readAsDataURL(file)); } catch { throw new Error('这个文件不是可识别的图片'); }
+  const side = Math.min(img.width, img.height);
+  const c = document.createElement('canvas');
+  c.width = c.height = SIZE;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, SIZE, SIZE);  // 透明图片垫白底
+  ctx.drawImage(img, (img.width - side) / 2, (img.height - side) / 2, side, side, 0, 0, SIZE, SIZE);
+  for (const q of [0.82, 0.7, 0.55, 0.4]) {
+    let url = c.toDataURL('image/webp', q);
+    if (!url.startsWith('data:image/webp')) url = c.toDataURL('image/jpeg', q);
+    if (url.length <= MAX_CHARS) return url;
+  }
+  throw new Error('图片压缩后还是太大，换一张试试');
+}
+
+function colorFor(name) {
+  let h = 0;
+  for (const ch of name) h = (h * 31 + ch.codePointAt(0)) >>> 0;
+  return PALETTE[h % PALETTE.length];
+}
+
+const SAFE_AVATAR = /^data:image\/(webp|jpeg|png);base64,[A-Za-z0-9+/]+=*$/;
+
+// 生成头像元素：有头像显示图片，没有显示首字彩色圆
+function avatarEl(name, avatar, size = 32) {
+  const el = document.createElement('span');
+  el.className = 'avatar';
+  el.style.width = el.style.height = size + 'px';
+  if (avatar && SAFE_AVATAR.test(avatar)) {
+    const img = document.createElement('img');
+    img.src = avatar;
+    img.alt = '';
+    el.append(img);
+  } else {
+    el.style.background = colorFor(name || '?');
+    el.style.fontSize = Math.round(size * 0.48) + 'px';
+    el.textContent = [...(name || '?')][0];
+  }
+  return el;
+}
+
+// ---- profile.js ----
+// 自己的头像：本机缓存一份，换头像时同时上传到服务器
+
+
+
+const myAvatar = () => store.get(STORAGE_KEYS.avatar) || '';
+
+// 上传头像；服务器还不认识本机时先用本机昵称占一下再传
+async function uploadAvatar(dataUrl) {
+  store.set(STORAGE_KEYS.avatar, dataUrl);
+  let result = await setAvatar(dataUrl);
+  const name = store.get(STORAGE_KEYS.playerName) || '';
+  if (result === null && name && await claimName(name).catch(() => false)) result = await setAvatar(dataUrl);
+  if (result === null) throw new Error('头像先存在本机了，等昵称确认后会再上传');
+}
+
+// 打开游戏时对一下本机和服务器的头像：服务器有、本机没有就拿回来；本机有、服务器没有（之前断网没传上）就补传
+async function syncMyAvatar() {
+  if (!store.get(STORAGE_KEYS.playerName)) return;
+  try {
+    const p = await myProfile();
+    if (p && p.avatar && !myAvatar()) store.set(STORAGE_KEYS.avatar, p.avatar);
+    else if (p && !p.avatar && myAvatar()) await setAvatar(myAvatar());
+  } catch { /* 连不上就下次再说 */ }
+}
+
 // ---- rankboard.js ----
 // 排行榜界面：顶栏“排行榜”弹窗 + 战报卡上的自动上榜。
 // 第一次结束时占一个昵称（全班唯一），以后每局结束自动上传；只有破了自己的纪录才传。
+
+
 
 
 
@@ -1210,6 +1339,7 @@ function renderList(rows) {
     if (i < 3) li.classList.add('top' + (i + 1));
     if (r.is_me) li.classList.add('mine');
     const no = document.createElement('span'); no.className = 'no'; no.textContent = i + 1;
+    const face = avatarEl(r.name, r.avatar, 32);
     const who = document.createElement('span'); who.className = 'who';
     const nm = document.createElement('b'); nm.textContent = r.name;
     const lv = document.createElement('small');
@@ -1217,7 +1347,7 @@ function renderList(rows) {
       + new Date(r.created_at).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
     who.append(nm, lv);
     const sc = document.createElement('span'); sc.className = 'pts'; sc.textContent = r.score;
-    li.append(no, who, sc);
+    li.append(no, face, who, sc);
     return li;
   }));
 }
@@ -1261,6 +1391,21 @@ function showNameLine(name) {
   $('upload-ask').hidden = true;
   $('upload-auto').hidden = false;
   $('player-label').textContent = name;
+  $('player-avatar').replaceChildren(avatarEl(name, myAvatar(), 24));
+}
+
+async function changeAvatar(e) {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  setMsg('正在换头像…');
+  try {
+    await uploadAvatar(await makeAvatar(file));
+    setMsg('头像换好了');
+  } catch (err) {
+    setMsg(err.message);
+  }
+  showNameLine(playerName());
 }
 
 function showRetry(message) {
@@ -1373,6 +1518,7 @@ function bindRankboard() {
   $('btn-upload').addEventListener('click', saveName);
   $('player-name').addEventListener('keydown', e => { if (e.key === 'Enter') saveName(); });
   $('btn-rename').addEventListener('click', () => showNameForm(playerName(), '保存'));
+  $('report-avatar').addEventListener('change', changeAvatar);
   $('btn-upload-board').addEventListener('click', openBoard);
 }
 
@@ -2243,12 +2389,34 @@ function bindSettings({ onRename, onChanged }) {
 
 
 
+
+
 const needsWelcome = () => leaderboardEnabled() && !store.get(STORAGE_KEYS.playerName);
 
 let entering = false;
+let pendingAvatar = '';
+
+function renderPreview() {
+  const name = cleanName($('welcome-name').value) || '?';
+  $('welcome-avatar-preview').replaceChildren(avatarEl(name, pendingAvatar, 72));
+}
+
+async function pickAvatar(e) {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    pendingAvatar = await makeAvatar(file);
+    $('welcome-avatar-tip').textContent = '换一张';
+  } catch (err) {
+    $('welcome-msg').textContent = err.message;
+  }
+  renderPreview();
+}
 
 function enterGame(name) {
   store.set(STORAGE_KEYS.playerName, name);
+  if (pendingAvatar) uploadAvatar(pendingAvatar).catch(() => { /* 头像已存本机，下次再传 */ });
   store.set(STORAGE_KEYS.uploadedBest, '0');
   $('welcome').hidden = true;
   state.paused = false;
@@ -2287,6 +2455,7 @@ function showWelcomeIfNeeded() {
   if (!needsWelcome()) return;
   state.paused = true;
   paintLevel($('welcome-pic'), MAX);
+  renderPreview();
   $('welcome').hidden = false;
   $('welcome-name').focus();
 }
@@ -2294,6 +2463,8 @@ function showWelcomeIfNeeded() {
 function bindWelcome() {
   $('btn-welcome').addEventListener('click', submitName);
   $('welcome-name').addEventListener('keydown', e => { if (e.key === 'Enter') submitName(); });
+  $('welcome-name').addEventListener('input', renderPreview);
+  $('welcome-avatar').addEventListener('change', pickAvatar);
 }
 
 // ---- announcements.js ----
@@ -2302,10 +2473,12 @@ const ANNOUNCEMENTS = [
   {
     id: '2026-10-03-guestbook',
     date: '10 月 3 日',
-    title: '给张楷的留言墙',
+    title: '留言墙和个人头像',
     items: [
       '顶部新增“留言”：想对张楷说的话都可以写在这里，所有人都能看到',
-      '署名用你的游戏昵称，每条最多 200 字，30 秒内只能发一条'
+      '署名用你的游戏昵称，每条最多 200 字，30 秒内只能发一条',
+      '可以上传自己的头像了：第一次起昵称时上传，或者在战报卡上点“换头像”；排行榜和留言墙都会显示',
+      '顶部给张楷换照片的按钮改名叫“皮肤”'
     ]
   },
   {
@@ -2329,7 +2502,7 @@ const ANNOUNCEMENTS = [
       '第一次打开先起个昵称，全班唯一，成绩自动进排行榜',
       '排行榜加了防刷分检查，明显伪造的成绩会被拒绝',
       '网络不好上传失败时，成绩先存在手机里，联网后自动补传',
-      '修了一批问题：打开“头像”设置或看排行榜时游戏会暂停；看完庆祝画面不会再立刻判负；苹果手机切回来后有声音了'
+      '修了一批问题：打开“皮肤”设置或看排行榜时游戏会暂停；看完庆祝画面不会再立刻判负；苹果手机切回来后有声音了'
     ]
   },
   {
@@ -2405,6 +2578,7 @@ function bindNotice() {
 
 
 
+
 const MAX_LEN = 200;
 let oldestId = null;
 let loading = false;
@@ -2428,7 +2602,7 @@ function messageItem(m) {
   const head = document.createElement('div'); head.className = 'msg-head';
   const who = document.createElement('b'); who.textContent = m.name;
   const when = document.createElement('span'); when.textContent = timeAgo(m.created_at);
-  head.append(who, when);
+  head.append(avatarEl(m.name, m.avatar, 26), who, when);
   const body = document.createElement('p'); body.className = 'msg-body';
   body.textContent = m.content;  // 用 textContent，留言里的任何内容都只当文字显示
   li.append(head, body);
@@ -2531,6 +2705,7 @@ function bindGuestbook() {
 
 
 
+
 function renderSoundBtn() {
   const muted = isMuted();
   $('btn-sound').textContent = muted ? '开声' : '静音';
@@ -2604,6 +2779,7 @@ async function boot() {
   requestAnimationFrame(loop);
   runTestHooks();
   flushPending();
+  syncMyAvatar();
   if (document.fonts) document.fonts.ready.then(fit);
 }
 

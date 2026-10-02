@@ -1,12 +1,12 @@
 // 结算：战报卡、本机前 5、复制战绩，以及合出大张楷时的庆祝画面。
-import { LEVELS, MAX, STORAGE_KEYS, SHARE_URL } from './config.js?v=10014806';
-import { skin, store } from './skin.js?v=78f85177';
-import { paintLevel } from './draw.js?v=b656f3a6';
-import { sfx } from './audio.js?v=da7d51d7';
-import { state } from './state.js?v=f33ab52c';
-import { onRoundOver } from './rankboard.js?v=e7fc099c';
-import { clearSave } from './save.js?v=1d02587e';
-import { loadDex } from './dex.js?v=5de70d2e';
+import { LEVELS, MAX, STORAGE_KEYS, SHARE_URL } from './config.js?v=19e16d6c';
+import { skin, store } from './skin.js?v=c519b08c';
+import { paintLevel } from './draw.js?v=d1d52de7';
+import { sfx } from './audio.js?v=94891e2a';
+import { state } from './state.js?v=6ff1b6c5';
+import { onRoundOver } from './rankboard.js?v=2e54d554';
+import { clearSave } from './save.js?v=b4a0a97a';
+import { loadDex } from './dex.js?v=4b4b3d16';
 import { $ } from './dom.js?v=5b57db68';
 
 const BOARD_SIZE = 5;

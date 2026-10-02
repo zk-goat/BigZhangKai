@@ -1,10 +1,10 @@
 // “换头像”面板：给每一级换照片、改名字。改动存在本机，关闭面板时如有改动就重开一局。
-import { LEVELS, MAX } from './config.js?v=10014806';
-import { skin, setSkin, resetSkin } from './skin.js?v=78f85177';
-import { readPhoto } from './trace.js?v=3fa96e74';
-import { drawKai } from './draw.js?v=b656f3a6';
+import { LEVELS, MAX } from './config.js?v=19e16d6c';
+import { skin, setSkin, resetSkin } from './skin.js?v=c519b08c';
+import { readPhoto } from './trace.js?v=2c2f3b91';
+import { drawKai } from './draw.js?v=d1d52de7';
 import { $ } from './dom.js?v=5b57db68';
-import { state } from './state.js?v=f33ab52c';
+import { state } from './state.js?v=6ff1b6c5';
 
 const NAME_MAX_LEN = 8;
 let dirty = false;

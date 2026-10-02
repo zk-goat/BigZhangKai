@@ -11,6 +11,7 @@ import { bindRankboard, flushPending } from './rankboard.js';
 import { bindWelcome, showWelcomeIfNeeded, needsWelcome } from './welcome.js';
 import { bindNotice, showNoticeIfNew } from './notice.js';
 import { bindGuestbook } from './guestbook.js';
+import { syncMyAvatar } from './profile.js';
 import { $ } from './dom.js';
 
 function renderSoundBtn() {
@@ -86,6 +87,7 @@ async function boot() {
   requestAnimationFrame(loop);
   runTestHooks();
   flushPending();
+  syncMyAvatar();
   if (document.fonts) document.fonts.ready.then(fit);
 }
 

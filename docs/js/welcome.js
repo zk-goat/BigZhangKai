@@ -1,18 +1,40 @@
 // 欢迎页：第一次打开时输入昵称（全班唯一）。已经有昵称的老玩家直接进游戏。
 // 连不上排行榜时也放行：昵称先存在本机，等下次上榜时再向服务器确认。
-import { STORAGE_KEYS, MAX } from './config.js?v=10014806';
-import { store } from './skin.js?v=78f85177';
-import { paintLevel } from './draw.js?v=b656f3a6';
-import { state } from './state.js?v=f33ab52c';
+import { STORAGE_KEYS, MAX } from './config.js?v=19e16d6c';
+import { store } from './skin.js?v=c519b08c';
+import { paintLevel } from './draw.js?v=d1d52de7';
+import { state } from './state.js?v=6ff1b6c5';
 import { $ } from './dom.js?v=5b57db68';
-import { leaderboardEnabled, claimName, cleanName, canPersist } from './leaderboard.js?v=845d1ba6';
+import { leaderboardEnabled, claimName, cleanName, canPersist } from './leaderboard.js?v=274d39d7';
+import { makeAvatar, avatarEl } from './avatar.js?v=950f7d8a';
+import { uploadAvatar } from './profile.js?v=6b30b260';
 
 export const needsWelcome = () => leaderboardEnabled() && !store.get(STORAGE_KEYS.playerName);
 
 let entering = false;
+let pendingAvatar = '';
+
+function renderPreview() {
+  const name = cleanName($('welcome-name').value) || '?';
+  $('welcome-avatar-preview').replaceChildren(avatarEl(name, pendingAvatar, 72));
+}
+
+async function pickAvatar(e) {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    pendingAvatar = await makeAvatar(file);
+    $('welcome-avatar-tip').textContent = '换一张';
+  } catch (err) {
+    $('welcome-msg').textContent = err.message;
+  }
+  renderPreview();
+}
 
 function enterGame(name) {
   store.set(STORAGE_KEYS.playerName, name);
+  if (pendingAvatar) uploadAvatar(pendingAvatar).catch(() => { /* 头像已存本机，下次再传 */ });
   store.set(STORAGE_KEYS.uploadedBest, '0');
   $('welcome').hidden = true;
   state.paused = false;
@@ -51,6 +73,7 @@ export function showWelcomeIfNeeded() {
   if (!needsWelcome()) return;
   state.paused = true;
   paintLevel($('welcome-pic'), MAX);
+  renderPreview();
   $('welcome').hidden = false;
   $('welcome-name').focus();
 }
@@ -58,4 +81,6 @@ export function showWelcomeIfNeeded() {
 export function bindWelcome() {
   $('btn-welcome').addEventListener('click', submitName);
   $('welcome-name').addEventListener('keydown', e => { if (e.key === 'Enter') submitName(); });
+  $('welcome-name').addEventListener('input', renderPreview);
+  $('welcome-avatar').addEventListener('change', pickAvatar);
 }

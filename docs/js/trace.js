@@ -1,5 +1,5 @@
 // 把抠好图的照片变成碰撞轮廓：裁掉透明边，沿不透明像素求凸包。没抠的照片就是一个方块。
-import { TRACE } from './config.js?v=10014806';
+import { TRACE } from './config.js?v=19e16d6c';
 import { convexHull, simplify, polygonAreaCentroid } from './geometry.js?v=6bdd869a';
 
 export function traceImage(img) {

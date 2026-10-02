@@ -1,16 +1,17 @@
 // 启动：加载照片 → 开局 → 绑定按钮。链接带 ?test=win / ?test=over（可加 &score=分数）时直接展示庆祝画面 / 示例战报。
-import { FIELD, MAX } from './config.js?v=10014806';
-import { initSkin } from './skin.js?v=78f85177';
-import { isMuted, toggleMuted } from './audio.js?v=da7d51d7';
-import { state } from './state.js?v=f33ab52c';
-import { copyShare, gameOver } from './report.js?v=6f477db4';
-import { startGame, restoreGame, loop, fit, bindInput, makeKai, updateHud, debugSnapshot, simulateGames } from './game.js?v=5b9f8921';
-import { readSave } from './save.js?v=1d02587e';
-import { bindSettings } from './settings.js?v=fabfe134';
-import { bindRankboard, flushPending } from './rankboard.js?v=e7fc099c';
-import { bindWelcome, showWelcomeIfNeeded, needsWelcome } from './welcome.js?v=0067ef2d';
-import { bindNotice, showNoticeIfNew } from './notice.js?v=e020408f';
-import { bindGuestbook } from './guestbook.js?v=e505b754';
+import { FIELD, MAX } from './config.js?v=19e16d6c';
+import { initSkin } from './skin.js?v=c519b08c';
+import { isMuted, toggleMuted } from './audio.js?v=94891e2a';
+import { state } from './state.js?v=6ff1b6c5';
+import { copyShare, gameOver } from './report.js?v=7fbc4f08';
+import { startGame, restoreGame, loop, fit, bindInput, makeKai, updateHud, debugSnapshot, simulateGames } from './game.js?v=ec11c74e';
+import { readSave } from './save.js?v=b4a0a97a';
+import { bindSettings } from './settings.js?v=0670365c';
+import { bindRankboard, flushPending } from './rankboard.js?v=2e54d554';
+import { bindWelcome, showWelcomeIfNeeded, needsWelcome } from './welcome.js?v=51a4e99b';
+import { bindNotice, showNoticeIfNew } from './notice.js?v=7ebc4bf3';
+import { bindGuestbook } from './guestbook.js?v=762394cd';
+import { syncMyAvatar } from './profile.js?v=6b30b260';
 import { $ } from './dom.js?v=5b57db68';
 
 function renderSoundBtn() {
@@ -86,6 +87,7 @@ async function boot() {
   requestAnimationFrame(loop);
   runTestHooks();
   flushPending();
+  syncMyAvatar();
   if (document.fonts) document.fonts.ready.then(fit);
 }
 

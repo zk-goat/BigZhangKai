@@ -6,13 +6,35 @@ import { paintLevel } from './draw.js';
 import { state } from './state.js';
 import { $ } from './dom.js';
 import { leaderboardEnabled, claimName, cleanName, canPersist } from './leaderboard.js';
+import { makeAvatar, avatarEl } from './avatar.js';
+import { uploadAvatar } from './profile.js';
 
 export const needsWelcome = () => leaderboardEnabled() && !store.get(STORAGE_KEYS.playerName);
 
 let entering = false;
+let pendingAvatar = '';
+
+function renderPreview() {
+  const name = cleanName($('welcome-name').value) || '?';
+  $('welcome-avatar-preview').replaceChildren(avatarEl(name, pendingAvatar, 72));
+}
+
+async function pickAvatar(e) {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    pendingAvatar = await makeAvatar(file);
+    $('welcome-avatar-tip').textContent = '换一张';
+  } catch (err) {
+    $('welcome-msg').textContent = err.message;
+  }
+  renderPreview();
+}
 
 function enterGame(name) {
   store.set(STORAGE_KEYS.playerName, name);
+  if (pendingAvatar) uploadAvatar(pendingAvatar).catch(() => { /* 头像已存本机，下次再传 */ });
   store.set(STORAGE_KEYS.uploadedBest, '0');
   $('welcome').hidden = true;
   state.paused = false;
@@ -51,6 +73,7 @@ export function showWelcomeIfNeeded() {
   if (!needsWelcome()) return;
   state.paused = true;
   paintLevel($('welcome-pic'), MAX);
+  renderPreview();
   $('welcome').hidden = false;
   $('welcome-name').focus();
 }
@@ -58,4 +81,6 @@ export function showWelcomeIfNeeded() {
 export function bindWelcome() {
   $('btn-welcome').addEventListener('click', submitName);
   $('welcome-name').addEventListener('keydown', e => { if (e.key === 'Enter') submitName(); });
+  $('welcome-name').addEventListener('input', renderPreview);
+  $('welcome-avatar').addEventListener('change', pickAvatar);
 }

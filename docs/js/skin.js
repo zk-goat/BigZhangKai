@@ -1,6 +1,6 @@
 // 皮肤：每一级的名字、照片和碰撞轮廓。内置照片开局加载；玩家在“换头像”里改的存在本机。
-import { LEVELS, RULES, STORAGE_KEYS } from './config.js?v=10014806';
-import { traceImage, loadImage } from './trace.js?v=3fa96e74';
+import { LEVELS, RULES, STORAGE_KEYS } from './config.js?v=19e16d6c';
+import { traceImage, loadImage } from './trace.js?v=2c2f3b91';
 
 export const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },

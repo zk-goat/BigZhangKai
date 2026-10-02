@@ -46,6 +46,7 @@ const REASONS = [
   ['daily limit', '今天发得够多了，明天再来'],
   ['invalid content', '留言要写 1～200 个字'],
   ['invalid name', '昵称要 1～12 个字'],
+  ['invalid avatar', '头像图片不符合要求，换一张试试'],
   ['implausible', '这局成绩没通过检查']
 ];
 function friendlyError(status, body) {
@@ -99,6 +100,17 @@ export async function submitScore({ score, topLevel, merges, durationS }) {
     p_merges: Math.max(0, merges),
     p_duration: Math.min(86400, Math.max(0, Math.round(durationS)))
   });
+}
+
+// 设置个人头像（data URL，传 null 删掉）：成功 'ok'；本机还没占过昵称返回 null
+export async function setAvatar(avatar) {
+  return rpc('set_avatar', { p_token: playerToken(), p_avatar: avatar });
+}
+
+// 自己的昵称和头像（本机缓存丢了时拿回来）
+export async function myProfile() {
+  const rows = await rpc('my_profile', { p_token: playerToken() });
+  return Array.isArray(rows) && rows[0] ? rows[0] : null;
 }
 
 export const MESSAGES_PAGE = 30;

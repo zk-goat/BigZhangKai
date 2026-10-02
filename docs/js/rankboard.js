@@ -1,10 +1,12 @@
 // 排行榜界面：顶栏“排行榜”弹窗 + 战报卡上的自动上榜。
 // 第一次结束时占一个昵称（全班唯一），以后每局结束自动上传；只有破了自己的纪录才传。
-import { STORAGE_KEYS } from './config.js?v=10014806';
-import { skin, store } from './skin.js?v=78f85177';
-import { state } from './state.js?v=f33ab52c';
+import { STORAGE_KEYS } from './config.js?v=19e16d6c';
+import { skin, store } from './skin.js?v=c519b08c';
+import { state } from './state.js?v=6ff1b6c5';
 import { $ } from './dom.js?v=5b57db68';
-import { leaderboardEnabled, fetchTop, submitScore, claimName, cleanName, canPersist } from './leaderboard.js?v=845d1ba6';
+import { leaderboardEnabled, fetchTop, submitScore, claimName, cleanName, canPersist } from './leaderboard.js?v=274d39d7';
+import { avatarEl, makeAvatar } from './avatar.js?v=950f7d8a';
+import { myAvatar, uploadAvatar } from './profile.js?v=6b30b260';
 
 const playerName = () => store.get(STORAGE_KEYS.playerName) || '';
 const uploadedBest = () => Number(store.get(STORAGE_KEYS.uploadedBest)) || 0;
@@ -49,6 +51,7 @@ function renderList(rows) {
     if (i < 3) li.classList.add('top' + (i + 1));
     if (r.is_me) li.classList.add('mine');
     const no = document.createElement('span'); no.className = 'no'; no.textContent = i + 1;
+    const face = avatarEl(r.name, r.avatar, 32);
     const who = document.createElement('span'); who.className = 'who';
     const nm = document.createElement('b'); nm.textContent = r.name;
     const lv = document.createElement('small');
@@ -56,7 +59,7 @@ function renderList(rows) {
       + new Date(r.created_at).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
     who.append(nm, lv);
     const sc = document.createElement('span'); sc.className = 'pts'; sc.textContent = r.score;
-    li.append(no, who, sc);
+    li.append(no, face, who, sc);
     return li;
   }));
 }
@@ -100,6 +103,21 @@ function showNameLine(name) {
   $('upload-ask').hidden = true;
   $('upload-auto').hidden = false;
   $('player-label').textContent = name;
+  $('player-avatar').replaceChildren(avatarEl(name, myAvatar(), 24));
+}
+
+async function changeAvatar(e) {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  setMsg('正在换头像…');
+  try {
+    await uploadAvatar(await makeAvatar(file));
+    setMsg('头像换好了');
+  } catch (err) {
+    setMsg(err.message);
+  }
+  showNameLine(playerName());
 }
 
 function showRetry(message) {
@@ -212,5 +230,6 @@ export function bindRankboard() {
   $('btn-upload').addEventListener('click', saveName);
   $('player-name').addEventListener('keydown', e => { if (e.key === 'Enter') saveName(); });
   $('btn-rename').addEventListener('click', () => showNameForm(playerName(), '保存'));
+  $('report-avatar').addEventListener('change', changeAvatar);
   $('btn-upload-board').addEventListener('click', openBoard);
 }

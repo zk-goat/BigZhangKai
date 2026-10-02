@@ -4,6 +4,7 @@ import { store } from './skin.js';
 import { state } from './state.js';
 import { $ } from './dom.js';
 import { leaderboardEnabled, postMessage, listMessages, claimName, MESSAGES_PAGE } from './leaderboard.js';
+import { avatarEl } from './avatar.js';
 
 const MAX_LEN = 200;
 let oldestId = null;
@@ -28,7 +29,7 @@ function messageItem(m) {
   const head = document.createElement('div'); head.className = 'msg-head';
   const who = document.createElement('b'); who.textContent = m.name;
   const when = document.createElement('span'); when.textContent = timeAgo(m.created_at);
-  head.append(who, when);
+  head.append(avatarEl(m.name, m.avatar, 26), who, when);
   const body = document.createElement('p'); body.className = 'msg-body';
   body.textContent = m.content;  // 用 textContent，留言里的任何内容都只当文字显示
   li.append(head, body);
