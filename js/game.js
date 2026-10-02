@@ -3,7 +3,7 @@ import { LEVELS, MAX, FIELD, PHYSICS, RULES, COLORS } from './config.js';
 import { skin, shapeFor, halfWidth } from './skin.js';
 import { popScale } from './geometry.js';
 import { drawKai } from './draw.js';
-import { sfx } from './audio.js';
+import { sfx, unlockAudio } from './audio.js';
 import { state, resetRound, addScore } from './state.js';
 import { resetEffects, mergeEffects, applyShake, drawEffects } from './effects.js';
 import { showWin, gameOver } from './report.js';
@@ -101,6 +101,8 @@ function clampAim(lv) {
   return Math.min(W - half, Math.max(half, state.aimX));
 }
 
+let cooldownTimer = 0;
+
 export function drop() {
   const overlayOpen = document.querySelector('.overlay:not([hidden])');
   if (!state.engine || !state.canDrop || state.over || state.paused || overlayOpen) return;
@@ -109,7 +111,8 @@ export function drop() {
   state.current = state.next;
   state.next = randLevel();
   state.canDrop = false;
-  setTimeout(() => { state.canDrop = true; }, RULES.dropCooldownMs);
+  clearTimeout(cooldownTimer);
+  cooldownTimer = setTimeout(() => { state.canDrop = true; }, RULES.dropCooldownMs);
 }
 
 function checkDanger(now) {
@@ -118,6 +121,17 @@ function checkDanger(now) {
   if (!risky) { state.dangerSince = 0; return; }
   if (!state.dangerSince) state.dangerSince = now;
   if (now - state.dangerSince > RULES.dangerHoldMs) gameOver();
+}
+
+// 测试用：当前所有张楷的位置与等级（只在 ?debug 时挂到 window 上）
+export function debugSnapshot() {
+  return {
+    over: state.over, paused: state.paused, score: state.score, topLevel: state.topLevel,
+    bodies: kaiBodies().map(b => ({
+      lv: b.kaiLevel, x: b.position.x, y: b.position.y,
+      minX: b.bounds.min.x, maxX: b.bounds.max.x, maxY: b.bounds.max.y, vy: b.velocity.y
+    }))
+  };
 }
 
 // ---------- 界面 ----------
@@ -133,6 +147,7 @@ export function updateHud() {
 }
 
 export function startGame() {
+  clearTimeout(cooldownTimer);
   resetRound(newEngine(), 0);
   state.next = randLevel();
   resetEffects();
@@ -181,13 +196,17 @@ export function loop(now) {
   acc = Math.min(acc + (now - last), PHYSICS.stepMs * PHYSICS.maxCatchUpSteps);
   last = now;
   if (!state.over && !state.paused) {
-    while (acc >= PHYSICS.stepMs) {
+    // 合出大张楷（暂停）或判负后，本帧剩下的补算和判负检查都跳过
+    while (acc >= PHYSICS.stepMs && !state.over && !state.paused) {
       Engine.update(state.engine, PHYSICS.stepMs);
       mergeNearby();
       acc -= PHYSICS.stepMs;
     }
-    checkDanger(now);
-  } else acc = 0;
+    if (!state.over && !state.paused) checkDanger(now);
+  } else {
+    acc = 0;
+    state.dangerSince = 0;  // 暂停期间不计越线时间，恢复后重新数 2 秒
+  }
   draw(now);
   requestAnimationFrame(loop);
 }
@@ -214,12 +233,12 @@ export function bindInput() {
     return ((e.clientX - rect.left) / rect.width) * W;
   };
   let pressing = false;
-  canvas.addEventListener('pointerdown', e => { pressing = true; state.aimX = toGameX(e); canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointerdown', e => { unlockAudio(); pressing = true; state.aimX = toGameX(e); canvas.setPointerCapture(e.pointerId); });
   canvas.addEventListener('pointermove', e => { state.aimX = toGameX(e); });
   canvas.addEventListener('pointerup', e => { if (pressing) { state.aimX = toGameX(e); drop(); } pressing = false; });
   window.addEventListener('keydown', e => {
-    if (e.key === 'ArrowLeft') state.aimX -= 16;
-    else if (e.key === 'ArrowRight') state.aimX += 16;
+    if (e.key === 'ArrowLeft') state.aimX = Math.max(0, state.aimX - 16);
+    else if (e.key === 'ArrowRight') state.aimX = Math.min(W, state.aimX + 16);
     else if ((e.key === ' ' || e.key === 'Enter') && document.activeElement === document.body) { e.preventDefault(); drop(); }
   });
   window.addEventListener('resize', fit);

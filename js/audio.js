@@ -7,6 +7,11 @@ let muted = store.get(STORAGE_KEYS.muted) === '1';
 
 export const isMuted = () => muted;
 
+// 在用户点击时调用：手机浏览器只允许在点击里恢复声音
+export function unlockAudio() {
+  if (audioCtx && audioCtx.state !== 'running') audioCtx.resume().catch(() => {});
+}
+
 export function toggleMuted() {
   muted = !muted;
   store.set(STORAGE_KEYS.muted, muted ? '1' : '0');
@@ -17,6 +22,7 @@ function tone(freq, start, dur, vol = 0.16, type = 'triangle') {
   if (muted) return;
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state !== 'running') audioCtx.resume().catch(() => {});  // iOS 切后台/来电后会被挂起
     const t0 = audioCtx.currentTime + start;
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
     o.type = type;

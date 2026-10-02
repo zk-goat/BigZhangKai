@@ -25,7 +25,9 @@ export function resetSkin() {
 function loadSavedSkin() {
   try {
     const s = JSON.parse(store.get(STORAGE_KEYS.skin) || 'null');
-    return Array.isArray(s) && s.length === LEVELS.length ? s : null;
+    const valid = Array.isArray(s) && s.length === LEVELS.length
+      && s.every(x => x && typeof x.name === 'string' && (x.photo === null || (typeof x.photo === 'string' && x.shape)));
+    return valid ? s : null;
   } catch { return null; }
 }
 

@@ -4,7 +4,7 @@ import { initSkin } from './skin.js';
 import { isMuted, toggleMuted } from './audio.js';
 import { state } from './state.js';
 import { copyShare, gameOver } from './report.js';
-import { startGame, loop, fit, bindInput, makeKai, updateHud } from './game.js';
+import { startGame, loop, fit, bindInput, makeKai, updateHud, debugSnapshot } from './game.js';
 import { bindSettings } from './settings.js';
 import { bindRankboard } from './rankboard.js';
 import { $ } from './dom.js';
@@ -28,6 +28,7 @@ function bindButtons() {
 
 function runTestHooks() {
   const q = location.search;
+  if (/[?&]debug/.test(q)) window.zkDebug = debugSnapshot;
   if (/[?&]test=win/.test(q)) {
     makeKai(FIELD.width / 2 - 60, 250, MAX - 1);
     makeKai(FIELD.width / 2 + 60, 250, MAX - 1);

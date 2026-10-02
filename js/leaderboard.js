@@ -8,13 +8,19 @@ const TIMEOUT_MS = 8000;
 export const leaderboardEnabled = () => Boolean(LEADERBOARD.url && LEADERBOARD.key);
 
 // 本机身份码：32 字节随机数，第一次用时生成
+// 存不进 localStorage 时（隐私模式、配额满）至少本次打开期间保持同一个身份
+let sessionToken = '';
+export const canPersist = () => store.set('dazhangkai-probe', '1');
+
 function playerToken() {
   const saved = store.get(STORAGE_KEYS.playerToken);
   if (saved && saved.length >= 32) return saved;
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  const token = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
-  store.set(STORAGE_KEYS.playerToken, token);
-  return token;
+  if (!sessionToken) {
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    sessionToken = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  }
+  store.set(STORAGE_KEYS.playerToken, sessionToken);
+  return sessionToken;
 }
 
 async function rpc(fn, args) {
@@ -40,8 +46,10 @@ async function rpc(fn, args) {
 }
 
 // 去掉首尾空白和控制字符，截到允许的长度
+// 去掉首尾空白、控制字符和零宽/方向控制等不可见字符，全角半角统一（与数据库端一致），截到允许长度
 export function cleanName(raw) {
-  return [...String(raw || '').replace(/[\u0000-\u001f\u007f]/g, '').trim()].slice(0, LEADERBOARD.nameMaxLen).join('');
+  const s = String(raw || '').normalize('NFKC').replace(/[\p{Cc}\p{Cf}]/gu, '').trim();
+  return [...s].slice(0, LEADERBOARD.nameMaxLen).join('');
 }
 
 // 占用或修改昵称：成功返回 true，被别人占了返回 false
@@ -58,7 +66,7 @@ export async function submitScore({ score, topLevel, merges, durationS }) {
     p_score: Math.max(0, Math.round(score)),
     p_top_level: Math.min(MAX, Math.max(0, topLevel)),
     p_merges: Math.max(0, merges),
-    p_duration: Math.max(0, Math.round(durationS))
+    p_duration: Math.min(86400, Math.max(0, Math.round(durationS)))
   });
 }
 

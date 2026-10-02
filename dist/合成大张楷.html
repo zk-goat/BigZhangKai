@@ -510,7 +510,9 @@ function resetSkin() {
 function loadSavedSkin() {
   try {
     const s = JSON.parse(store.get(STORAGE_KEYS.skin) || 'null');
-    return Array.isArray(s) && s.length === LEVELS.length ? s : null;
+    const valid = Array.isArray(s) && s.length === LEVELS.length
+      && s.every(x => x && typeof x.name === 'string' && (x.photo === null || (typeof x.photo === 'string' && x.shape)));
+    return valid ? s : null;
   } catch { return null; }
 }
 
@@ -565,6 +567,11 @@ let muted = store.get(STORAGE_KEYS.muted) === '1';
 
 const isMuted = () => muted;
 
+// 在用户点击时调用：手机浏览器只允许在点击里恢复声音
+function unlockAudio() {
+  if (audioCtx && audioCtx.state !== 'running') audioCtx.resume().catch(() => {});
+}
+
 function toggleMuted() {
   muted = !muted;
   store.set(STORAGE_KEYS.muted, muted ? '1' : '0');
@@ -575,6 +582,7 @@ function tone(freq, start, dur, vol = 0.16, type = 'triangle') {
   if (muted) return;
   try {
     audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state !== 'running') audioCtx.resume().catch(() => {});  // iOS 切后台/来电后会被挂起
     const t0 = audioCtx.currentTime + start;
     const o = audioCtx.createOscillator(), g = audioCtx.createGain();
     o.type = type;
@@ -737,13 +745,19 @@ const TIMEOUT_MS = 8000;
 const leaderboardEnabled = () => Boolean(LEADERBOARD.url && LEADERBOARD.key);
 
 // 本机身份码：32 字节随机数，第一次用时生成
+// 存不进 localStorage 时（隐私模式、配额满）至少本次打开期间保持同一个身份
+let sessionToken = '';
+const canPersist = () => store.set('dazhangkai-probe', '1');
+
 function playerToken() {
   const saved = store.get(STORAGE_KEYS.playerToken);
   if (saved && saved.length >= 32) return saved;
-  const bytes = crypto.getRandomValues(new Uint8Array(32));
-  const token = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
-  store.set(STORAGE_KEYS.playerToken, token);
-  return token;
+  if (!sessionToken) {
+    const bytes = crypto.getRandomValues(new Uint8Array(32));
+    sessionToken = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  }
+  store.set(STORAGE_KEYS.playerToken, sessionToken);
+  return sessionToken;
 }
 
 async function rpc(fn, args) {
@@ -769,8 +783,10 @@ async function rpc(fn, args) {
 }
 
 // 去掉首尾空白和控制字符，截到允许的长度
+// 去掉首尾空白、控制字符和零宽/方向控制等不可见字符，全角半角统一（与数据库端一致），截到允许长度
 function cleanName(raw) {
-  return [...String(raw || '').replace(/[\u0000-\u001f\u007f]/g, '').trim()].slice(0, LEADERBOARD.nameMaxLen).join('');
+  const s = String(raw || '').normalize('NFKC').replace(/[\p{Cc}\p{Cf}]/gu, '').trim();
+  return [...s].slice(0, LEADERBOARD.nameMaxLen).join('');
 }
 
 // 占用或修改昵称：成功返回 true，被别人占了返回 false
@@ -787,7 +803,7 @@ async function submitScore({ score, topLevel, merges, durationS }) {
     p_score: Math.max(0, Math.round(score)),
     p_top_level: Math.min(MAX, Math.max(0, topLevel)),
     p_merges: Math.max(0, merges),
-    p_duration: Math.max(0, Math.round(durationS))
+    p_duration: Math.min(86400, Math.max(0, Math.round(durationS)))
   });
 }
 
@@ -881,18 +897,20 @@ function showRetry(message) {
 
 async function autoUpload() {
   if (!playerName() || uploadedThisRound) return;
+  // 先把本局数据拷出来：上传途中玩家可能已经点了“再来一局”
+  const run = {
+    score: state.score, topLevel: state.topLevel, merges: state.mergeCount,
+    durationS: (Date.now() - state.startedAt) / 1000
+  };
   const best = uploadedBest();
-  if (state.score <= 0 || state.score <= best) {
+  if (run.score <= 0 || run.score <= best) {
     setMsg(best > 0 ? `本局没破纪录，榜上保留你的最高分 ${best}` : '本局 0 分，没有上传');
     return;
   }
   uploadedThisRound = true;
   setMsg('正在上榜…');
   try {
-    const rank = await submitScore({
-      score: state.score, topLevel: state.topLevel, merges: state.mergeCount,
-      durationS: (Date.now() - state.startedAt) / 1000
-    });
+    const rank = await submitScore(run);
     if (rank === null) {
       // 服务器不认识这台设备（换了浏览器/数据被清）：重新占一次昵称
       const oldName = playerName();
@@ -902,7 +920,7 @@ async function autoUpload() {
       setMsg('需要重新确认一下昵称');
       return;
     }
-    store.set(STORAGE_KEYS.uploadedBest, String(state.score));
+    store.set(STORAGE_KEYS.uploadedBest, String(run.score));
     setMsg(`已自动上榜，全班第 ${rank} 名`);
   } catch (err) {
     uploadedThisRound = false;
@@ -910,16 +928,21 @@ async function autoUpload() {
   }
 }
 
+let savingName = false;
+
 async function saveName() {
+  if (savingName) return;  // 回车和按钮连着触发时只提交一次
+  if (!canPersist()) { setMsg('这个浏览器不能保存数据（可能是无痕模式），没法上榜'); return; }
   const name = cleanName($('player-name').value);
   if (!name) { setMsg('先填一个昵称'); $('player-name').focus(); return; }
   if (name === playerName()) { showNameLine(name); return; }
   $('btn-upload').disabled = true;
+  savingName = true;
   setMsg('检查昵称…');
   try {
     if (!(await claimName(name))) {
       $('btn-upload').disabled = false;
-      setMsg(`「${name}」已经被别人用了，换一个`);
+      setMsg(`「${name}」已经被别人用了，换一个（如果是你自己换了手机或清了数据，找管理员释放）`);
       $('player-name').focus();
       return;
     }
@@ -935,6 +958,8 @@ async function saveName() {
   } catch (err) {
     $('btn-upload').disabled = false;
     setMsg(err.message);
+  } finally {
+    savingName = false;
   }
 }
 
@@ -986,7 +1011,7 @@ function showWin() {
 function loadBoard() {
   try {
     const b = JSON.parse(store.get(STORAGE_KEYS.board) || '[]');
-    return Array.isArray(b) ? b.filter(r => Number.isFinite(r.score) && Number.isInteger(r.lv) && r.lv <= MAX) : [];
+    return Array.isArray(b) ? b.filter(r => Number.isFinite(r.score) && Number.isInteger(r.lv) && r.lv >= 0 && r.lv <= MAX) : [];
   } catch { return []; }
 }
 
@@ -1277,6 +1302,8 @@ function clampAim(lv) {
   return Math.min(W - half, Math.max(half, state.aimX));
 }
 
+let cooldownTimer = 0;
+
 function drop() {
   const overlayOpen = document.querySelector('.overlay:not([hidden])');
   if (!state.engine || !state.canDrop || state.over || state.paused || overlayOpen) return;
@@ -1285,7 +1312,8 @@ function drop() {
   state.current = state.next;
   state.next = randLevel();
   state.canDrop = false;
-  setTimeout(() => { state.canDrop = true; }, RULES.dropCooldownMs);
+  clearTimeout(cooldownTimer);
+  cooldownTimer = setTimeout(() => { state.canDrop = true; }, RULES.dropCooldownMs);
 }
 
 function checkDanger(now) {
@@ -1294,6 +1322,17 @@ function checkDanger(now) {
   if (!risky) { state.dangerSince = 0; return; }
   if (!state.dangerSince) state.dangerSince = now;
   if (now - state.dangerSince > RULES.dangerHoldMs) gameOver();
+}
+
+// 测试用：当前所有张楷的位置与等级（只在 ?debug 时挂到 window 上）
+function debugSnapshot() {
+  return {
+    over: state.over, paused: state.paused, score: state.score, topLevel: state.topLevel,
+    bodies: kaiBodies().map(b => ({
+      lv: b.kaiLevel, x: b.position.x, y: b.position.y,
+      minX: b.bounds.min.x, maxX: b.bounds.max.x, maxY: b.bounds.max.y, vy: b.velocity.y
+    }))
+  };
 }
 
 // ---------- 界面 ----------
@@ -1309,6 +1348,7 @@ function updateHud() {
 }
 
 function startGame() {
+  clearTimeout(cooldownTimer);
   resetRound(newEngine(), 0);
   state.next = randLevel();
   resetEffects();
@@ -1357,13 +1397,17 @@ function loop(now) {
   acc = Math.min(acc + (now - last), PHYSICS.stepMs * PHYSICS.maxCatchUpSteps);
   last = now;
   if (!state.over && !state.paused) {
-    while (acc >= PHYSICS.stepMs) {
+    // 合出大张楷（暂停）或判负后，本帧剩下的补算和判负检查都跳过
+    while (acc >= PHYSICS.stepMs && !state.over && !state.paused) {
       Engine.update(state.engine, PHYSICS.stepMs);
       mergeNearby();
       acc -= PHYSICS.stepMs;
     }
-    checkDanger(now);
-  } else acc = 0;
+    if (!state.over && !state.paused) checkDanger(now);
+  } else {
+    acc = 0;
+    state.dangerSince = 0;  // 暂停期间不计越线时间，恢复后重新数 2 秒
+  }
   draw(now);
   requestAnimationFrame(loop);
 }
@@ -1390,12 +1434,12 @@ function bindInput() {
     return ((e.clientX - rect.left) / rect.width) * W;
   };
   let pressing = false;
-  canvas.addEventListener('pointerdown', e => { pressing = true; state.aimX = toGameX(e); canvas.setPointerCapture(e.pointerId); });
+  canvas.addEventListener('pointerdown', e => { unlockAudio(); pressing = true; state.aimX = toGameX(e); canvas.setPointerCapture(e.pointerId); });
   canvas.addEventListener('pointermove', e => { state.aimX = toGameX(e); });
   canvas.addEventListener('pointerup', e => { if (pressing) { state.aimX = toGameX(e); drop(); } pressing = false; });
   window.addEventListener('keydown', e => {
-    if (e.key === 'ArrowLeft') state.aimX -= 16;
-    else if (e.key === 'ArrowRight') state.aimX += 16;
+    if (e.key === 'ArrowLeft') state.aimX = Math.max(0, state.aimX - 16);
+    else if (e.key === 'ArrowRight') state.aimX = Math.min(W, state.aimX + 16);
     else if ((e.key === ' ' || e.key === 'Enter') && document.activeElement === document.body) { e.preventDefault(); drop(); }
   });
   window.addEventListener('resize', fit);
@@ -1412,8 +1456,10 @@ function bindInput() {
 
 
 
+
 const NAME_MAX_LEN = 8;
 let dirty = false;
+let pausedBySettings = false;
 
 function updateLevel(i, patch) {
   setSkin(skin.map((x, j) => (j === i ? { ...x, ...patch } : x)));
@@ -1442,7 +1488,8 @@ function renderRows(onRename) {
       onRename(); paint();
     });
 
-    const up = document.createElement('label'); up.className = 'up'; up.textContent = s.photo ? '换照片' : '传照片';
+    const up = document.createElement('label'); up.className = 'up';
+    up.append(document.createTextNode(s.photo ? '换照片' : '传照片'));
     const fi = document.createElement('input');
     Object.assign(fi, { type: 'file', accept: 'image/*', id: 'photo-' + i });
     fi.addEventListener('change', async () => {
@@ -1450,7 +1497,10 @@ function renderRows(onRename) {
       try {
         updateLevel(i, await readPhoto(fi.files[0]));
         renderRows(onRename);
-      } catch (err) { up.textContent = err.message; }
+      } catch (err) {
+        up.firstChild.textContent = err.message;  // 只改文字，保留里面的文件选择框
+        fi.value = '';
+      }
     });
     up.append(fi);
     row.append(n, pv, name, up);
@@ -1461,11 +1511,15 @@ function renderRows(onRename) {
 // onRename：名字改了要刷新进度条；onChanged：关闭面板时有改动就重开
 function bindSettings({ onRename, onChanged }) {
   $('btn-set').addEventListener('click', () => {
+    pausedBySettings = !state.over && !state.paused;
+    if (pausedBySettings) state.paused = true;
     renderRows(onRename);
     $('settings').hidden = false;
   });
   $('btn-close').addEventListener('click', () => {
     $('settings').hidden = true;
+    if (pausedBySettings) state.paused = false;
+    pausedBySettings = false;
     if (dirty) { dirty = false; onChanged(); }
   });
   $('btn-reset-skin').addEventListener('click', () => {
@@ -1515,6 +1569,7 @@ function bindButtons() {
 
 function runTestHooks() {
   const q = location.search;
+  if (/[?&]debug/.test(q)) window.zkDebug = debugSnapshot;
   if (/[?&]test=win/.test(q)) {
     makeKai(FIELD.width / 2 - 60, 250, MAX - 1);
     makeKai(FIELD.width / 2 + 60, 250, MAX - 1);

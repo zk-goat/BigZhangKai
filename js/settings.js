@@ -4,9 +4,11 @@ import { skin, setSkin, resetSkin } from './skin.js';
 import { readPhoto } from './trace.js';
 import { drawKai } from './draw.js';
 import { $ } from './dom.js';
+import { state } from './state.js';
 
 const NAME_MAX_LEN = 8;
 let dirty = false;
+let pausedBySettings = false;
 
 function updateLevel(i, patch) {
   setSkin(skin.map((x, j) => (j === i ? { ...x, ...patch } : x)));
@@ -35,7 +37,8 @@ function renderRows(onRename) {
       onRename(); paint();
     });
 
-    const up = document.createElement('label'); up.className = 'up'; up.textContent = s.photo ? '换照片' : '传照片';
+    const up = document.createElement('label'); up.className = 'up';
+    up.append(document.createTextNode(s.photo ? '换照片' : '传照片'));
     const fi = document.createElement('input');
     Object.assign(fi, { type: 'file', accept: 'image/*', id: 'photo-' + i });
     fi.addEventListener('change', async () => {
@@ -43,7 +46,10 @@ function renderRows(onRename) {
       try {
         updateLevel(i, await readPhoto(fi.files[0]));
         renderRows(onRename);
-      } catch (err) { up.textContent = err.message; }
+      } catch (err) {
+        up.firstChild.textContent = err.message;  // 只改文字，保留里面的文件选择框
+        fi.value = '';
+      }
     });
     up.append(fi);
     row.append(n, pv, name, up);
@@ -54,11 +60,15 @@ function renderRows(onRename) {
 // onRename：名字改了要刷新进度条；onChanged：关闭面板时有改动就重开
 export function bindSettings({ onRename, onChanged }) {
   $('btn-set').addEventListener('click', () => {
+    pausedBySettings = !state.over && !state.paused;
+    if (pausedBySettings) state.paused = true;
     renderRows(onRename);
     $('settings').hidden = false;
   });
   $('btn-close').addEventListener('click', () => {
     $('settings').hidden = true;
+    if (pausedBySettings) state.paused = false;
+    pausedBySettings = false;
     if (dirty) { dirty = false; onChanged(); }
   });
   $('btn-reset-skin').addEventListener('click', () => {

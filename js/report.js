@@ -20,7 +20,7 @@ export function showWin() {
 function loadBoard() {
   try {
     const b = JSON.parse(store.get(STORAGE_KEYS.board) || '[]');
-    return Array.isArray(b) ? b.filter(r => Number.isFinite(r.score) && Number.isInteger(r.lv) && r.lv <= MAX) : [];
+    return Array.isArray(b) ? b.filter(r => Number.isFinite(r.score) && Number.isInteger(r.lv) && r.lv >= 0 && r.lv <= MAX) : [];
   } catch { return []; }
 }
 

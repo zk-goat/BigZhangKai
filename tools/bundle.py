@@ -17,7 +17,22 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 OUT = ROOT / "dist" / "合成大张楷.html"
 IMPORT_RE = re.compile(r"^import\s+\{([^}]*)\}\s+from\s+'\./([\w-]+)\.js';\s*$", re.M)
-DECL_RE = re.compile(r"^(?:export\s+)?(?:async\s+)?(?:const|let|function)\s+([A-Za-z_$][\w$]*)", re.M)
+
+
+VAR_LINE_RE = re.compile(r"^(?:export\s+)?(?:const|let)\s+(.+)$", re.M)
+NAME_EQ_RE = re.compile(r"(?:^|,)\s*([A-Za-z_$][\w$]*)\s*=")
+
+
+def top_level_names(src):
+    """顶层声明的名字：函数、普通变量、一行多个变量、解构（const { a, b: c } = …）。"""
+    names = re.findall(r"^(?:export\s+)?(?:async\s+)?function\s+([A-Za-z_$][\w$]*)", src, re.M)
+    for rest in VAR_LINE_RE.findall(src):
+        if rest.startswith("{"):
+            inner = rest[1:rest.index("}")]
+            names += [part.split(":")[-1].strip() for part in inner.split(",") if part.strip()]
+        else:
+            names += NAME_EQ_RE.findall(rest)
+    return names
 
 
 def data_uri(path, mime):
@@ -51,7 +66,7 @@ def bundle_js():
         if leftover:
             sys.exit(f"{name}.js 有打包脚本不认识的 import 写法：{leftover[0]}")
         # 所有模块拼进同一个作用域，顶层同名定义会冲突，提前报错
-        for decl in DECL_RE.findall(src):
+        for decl in top_level_names(src):
             if decl in owners:
                 sys.exit(f"顶层重名：{decl} 同时出现在 {owners[decl]}.js 和 {name}.js")
             owners[decl] = name

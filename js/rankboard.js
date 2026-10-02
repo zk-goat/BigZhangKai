@@ -4,7 +4,7 @@ import { STORAGE_KEYS } from './config.js';
 import { skin, store } from './skin.js';
 import { state } from './state.js';
 import { $ } from './dom.js';
-import { leaderboardEnabled, fetchTop, submitScore, claimName, cleanName } from './leaderboard.js';
+import { leaderboardEnabled, fetchTop, submitScore, claimName, cleanName, canPersist } from './leaderboard.js';
 
 const playerName = () => store.get(STORAGE_KEYS.playerName) || '';
 const uploadedBest = () => Number(store.get(STORAGE_KEYS.uploadedBest)) || 0;
@@ -82,18 +82,20 @@ function showRetry(message) {
 
 async function autoUpload() {
   if (!playerName() || uploadedThisRound) return;
+  // 先把本局数据拷出来：上传途中玩家可能已经点了“再来一局”
+  const run = {
+    score: state.score, topLevel: state.topLevel, merges: state.mergeCount,
+    durationS: (Date.now() - state.startedAt) / 1000
+  };
   const best = uploadedBest();
-  if (state.score <= 0 || state.score <= best) {
+  if (run.score <= 0 || run.score <= best) {
     setMsg(best > 0 ? `本局没破纪录，榜上保留你的最高分 ${best}` : '本局 0 分，没有上传');
     return;
   }
   uploadedThisRound = true;
   setMsg('正在上榜…');
   try {
-    const rank = await submitScore({
-      score: state.score, topLevel: state.topLevel, merges: state.mergeCount,
-      durationS: (Date.now() - state.startedAt) / 1000
-    });
+    const rank = await submitScore(run);
     if (rank === null) {
       // 服务器不认识这台设备（换了浏览器/数据被清）：重新占一次昵称
       const oldName = playerName();
@@ -103,7 +105,7 @@ async function autoUpload() {
       setMsg('需要重新确认一下昵称');
       return;
     }
-    store.set(STORAGE_KEYS.uploadedBest, String(state.score));
+    store.set(STORAGE_KEYS.uploadedBest, String(run.score));
     setMsg(`已自动上榜，全班第 ${rank} 名`);
   } catch (err) {
     uploadedThisRound = false;
@@ -111,16 +113,21 @@ async function autoUpload() {
   }
 }
 
+let savingName = false;
+
 async function saveName() {
+  if (savingName) return;  // 回车和按钮连着触发时只提交一次
+  if (!canPersist()) { setMsg('这个浏览器不能保存数据（可能是无痕模式），没法上榜'); return; }
   const name = cleanName($('player-name').value);
   if (!name) { setMsg('先填一个昵称'); $('player-name').focus(); return; }
   if (name === playerName()) { showNameLine(name); return; }
   $('btn-upload').disabled = true;
+  savingName = true;
   setMsg('检查昵称…');
   try {
     if (!(await claimName(name))) {
       $('btn-upload').disabled = false;
-      setMsg(`「${name}」已经被别人用了，换一个`);
+      setMsg(`「${name}」已经被别人用了，换一个（如果是你自己换了手机或清了数据，找管理员释放）`);
       $('player-name').focus();
       return;
     }
@@ -136,6 +143,8 @@ async function saveName() {
   } catch (err) {
     $('btn-upload').disabled = false;
     setMsg(err.message);
+  } finally {
+    savingName = false;
   }
 }
 
