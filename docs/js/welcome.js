@@ -5,7 +5,7 @@ import { store } from './skin.js?v=78f85177';
 import { paintLevel } from './draw.js?v=b656f3a6';
 import { state } from './state.js?v=f33ab52c';
 import { $ } from './dom.js?v=5b57db68';
-import { leaderboardEnabled, claimName, cleanName, canPersist } from './leaderboard.js?v=457b3a2f';
+import { leaderboardEnabled, claimName, cleanName, canPersist } from './leaderboard.js?v=845d1ba6';
 
 export const needsWelcome = () => leaderboardEnabled() && !store.get(STORAGE_KEYS.playerName);
 

@@ -40,6 +40,21 @@ async function rpc(fn, args, retries = NETWORK_RETRIES) {
   }
 }
 
+// 服务器拒绝时，把数据库函数里的原因翻译成大白话
+const REASONS = [
+  ['too frequent', '发得太快了，过一会儿再试'],
+  ['daily limit', '今天发得够多了，明天再来'],
+  ['invalid content', '留言要写 1～200 个字'],
+  ['invalid name', '昵称要 1～12 个字'],
+  ['implausible', '这局成绩没通过检查']
+];
+function friendlyError(status, body) {
+  let message = '';
+  try { message = JSON.parse(body).message || ''; } catch { /* 不是 JSON */ }
+  const hit = REASONS.find(([key]) => message.includes(key));
+  return hit ? hit[1] : `服务器暂时出错了（${status}）`;
+}
+
 async function rpcOnce(fn, args) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
@@ -50,8 +65,8 @@ async function rpcOnce(fn, args) {
       headers: { apikey: LEADERBOARD.key, 'Content-Type': 'application/json' },
       body: JSON.stringify(args)
     });
-    if (!res.ok) throw new Error(`排行榜暂时出错了（${res.status}）`);
     const text = await res.text();
+    if (!res.ok) throw new Error(friendlyError(res.status, text));
     return text ? JSON.parse(text) : null;  // 函数返回 null 时响应体可能为空
   } catch (err) {
     if (err.name === 'AbortError') throw networkError('连接排行榜超时');
@@ -84,6 +99,19 @@ export async function submitScore({ score, topLevel, merges, durationS }) {
     p_merges: Math.max(0, merges),
     p_duration: Math.min(86400, Math.max(0, Math.round(durationS)))
   });
+}
+
+export const MESSAGES_PAGE = 30;
+
+// 给张楷留言：成功返回 'ok'；本机还没占过昵称返回 null
+export async function postMessage(content) {
+  return rpc('post_message', { p_token: playerToken(), p_content: content });
+}
+
+// 读留言：最新的在前；before 传上一页最后一条的 id 翻页
+export async function listMessages(before = null) {
+  const rows = await rpc('list_messages', { p_token: playerToken(), p_limit: MESSAGES_PAGE, p_before: before });
+  return Array.isArray(rows) ? rows : [];
 }
 
 // 前 N 名，每人只取最高分；is_me 标出自己

@@ -3,18 +3,19 @@ import { FIELD, MAX } from './config.js?v=10014806';
 import { initSkin } from './skin.js?v=78f85177';
 import { isMuted, toggleMuted } from './audio.js?v=da7d51d7';
 import { state } from './state.js?v=f33ab52c';
-import { copyShare, gameOver } from './report.js?v=01f93252';
-import { startGame, restoreGame, loop, fit, bindInput, makeKai, updateHud, debugSnapshot, simulateGames } from './game.js?v=c5f09987';
+import { copyShare, gameOver } from './report.js?v=6f477db4';
+import { startGame, restoreGame, loop, fit, bindInput, makeKai, updateHud, debugSnapshot, simulateGames } from './game.js?v=5b9f8921';
 import { readSave } from './save.js?v=1d02587e';
 import { bindSettings } from './settings.js?v=fabfe134';
-import { bindRankboard, flushPending } from './rankboard.js?v=3a9d858a';
-import { bindWelcome, showWelcomeIfNeeded, needsWelcome } from './welcome.js?v=d8e8a156';
-import { bindNotice, showNoticeIfNew } from './notice.js?v=67b3bc73';
+import { bindRankboard, flushPending } from './rankboard.js?v=e7fc099c';
+import { bindWelcome, showWelcomeIfNeeded, needsWelcome } from './welcome.js?v=0067ef2d';
+import { bindNotice, showNoticeIfNew } from './notice.js?v=e020408f';
+import { bindGuestbook } from './guestbook.js?v=e505b754';
 import { $ } from './dom.js?v=5b57db68';
 
 function renderSoundBtn() {
   const muted = isMuted();
-  $('btn-sound').textContent = muted ? '开声音' : '静音';
+  $('btn-sound').textContent = muted ? '开声' : '静音';
   $('btn-sound').setAttribute('aria-pressed', String(!muted));
 }
 
@@ -39,6 +40,7 @@ function bindButtons() {
   bindRankboard();
   bindWelcome();
   bindNotice();
+  bindGuestbook();
   renderSoundBtn();
 }
 

@@ -10,11 +10,12 @@
 <div class="top">
   <h1>合成大张楷</h1>
   <div class="btns">
-    <button id="btn-set" type="button">换头像</button>
+    <button id="btn-set" type="button">头像</button>
     <button id="btn-restart" type="button">重开</button>
     <button id="btn-sound" type="button" aria-pressed="true">静音</button>
-    <button id="btn-rank" type="button" hidden>排行榜</button>
+    <button id="btn-rank" type="button" hidden>排行</button>
     <button id="btn-notice" type="button">公告</button>
+    <button id="btn-book" type="button" hidden>留言</button>
   </div>
   <div class="score"><span id="score">0</span><small>最高 <span id="best">0</span></small></div>
 </div>
@@ -56,6 +57,26 @@
     <input id="welcome-name" type="text" maxlength="12" placeholder="你的昵称（最多 12 个字）" autocomplete="nickname">
     <button id="btn-welcome" type="button">开始玩</button>
     <p class="welcome-msg" id="welcome-msg" role="status"></p>
+  </div>
+</div>
+
+<div class="overlay" id="guestbook" hidden>
+  <div class="card book-card">
+    <h2>给张楷的留言墙</h2>
+    <div class="book-compose">
+      <label class="sr-only" for="book-input">留言内容</label>
+      <textarea id="book-input" rows="3" maxlength="400" placeholder="想对张楷说点什么？（所有人都能看到）"></textarea>
+      <div class="book-row">
+        <span class="book-who" id="book-who"></span>
+        <span class="book-count" id="book-count">0/200</span>
+        <button id="book-send" type="button">发送</button>
+      </div>
+      <p class="book-msg" id="book-msg" role="status"></p>
+    </div>
+    <ol class="book-list" id="book-list"></ol>
+    <p class="book-status" id="book-status" role="status"></p>
+    <button class="linkish book-more" id="book-more" type="button" hidden>加载更早的留言</button>
+    <div class="actions"><button id="book-close" type="button">关闭</button></div>
   </div>
 </div>
 

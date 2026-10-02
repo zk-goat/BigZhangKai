@@ -10,11 +10,12 @@ import { bindSettings } from './settings.js';
 import { bindRankboard, flushPending } from './rankboard.js';
 import { bindWelcome, showWelcomeIfNeeded, needsWelcome } from './welcome.js';
 import { bindNotice, showNoticeIfNew } from './notice.js';
+import { bindGuestbook } from './guestbook.js';
 import { $ } from './dom.js';
 
 function renderSoundBtn() {
   const muted = isMuted();
-  $('btn-sound').textContent = muted ? '开声音' : '静音';
+  $('btn-sound').textContent = muted ? '开声' : '静音';
   $('btn-sound').setAttribute('aria-pressed', String(!muted));
 }
 
@@ -39,6 +40,7 @@ function bindButtons() {
   bindRankboard();
   bindWelcome();
   bindNotice();
+  bindGuestbook();
   renderSoundBtn();
 }
 
