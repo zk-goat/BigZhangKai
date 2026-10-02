@@ -8,7 +8,7 @@ import { startGame, restoreGame, loop, fit, bindInput, makeKai, debugSnapshot, s
 import { readSave } from './save.js?v=36204485';
 import { bindRankboard, flushPending } from './rankboard.js?v=e5301e4a';
 import { bindWelcome, showWelcomeIfNeeded, needsWelcome } from './welcome.js?v=ccf7b53f';
-import { bindNotice, showNoticeIfNew } from './notice.js?v=5e410f72';
+import { bindNotice, showNoticeIfNew } from './notice.js?v=4c12c482';
 import { bindGuestbook } from './guestbook.js?v=d4bcb60c';
 import { syncMyAvatar } from './profile.js?v=afaeee37';
 import { $ } from './dom.js?v=5b57db68';
