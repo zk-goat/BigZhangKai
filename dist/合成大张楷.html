@@ -954,7 +954,7 @@ function drawPhoto(ctx, r, lv, { s, sh, bottom, verts }, img, shiny) {
   if (r >= NAME_MIN_R) drawName(ctx, r, lv, bottom * 0.45);
   if (lv === MAX) {
     // 第 14 级照片的人头偏左，皇冠跟着照片里的头走，而不是跟着整张照片的重心走。
-    ctx.translate(x + w * 0.29, y + h * 0.055);
+    ctx.translate(x + w * 0.26, y + h * 0.055);
     drawCrown(ctx, w * 0.42);
   }
 }
