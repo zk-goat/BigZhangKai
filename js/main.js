@@ -45,7 +45,7 @@ function bindButtons() {
 
 function runTestHooks() {
   const q = location.search;
-  if (/[?&]debug/.test(q)) Object.assign(window, { zkDebug: debugSnapshot, zkSim: simulateGames });
+  if (/[?&]debug/.test(q)) Object.assign(window, { zkDebug: debugSnapshot, zkSim: simulateGames, zkSpawn: makeKai });
   if (/[?&]test=win/.test(q)) {
     makeKai(FIELD.width / 2 - 60, 250, MAX - 1);
     makeKai(FIELD.width / 2 + 60, 250, MAX - 1);

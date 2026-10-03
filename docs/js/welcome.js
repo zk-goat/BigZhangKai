@@ -1,13 +1,13 @@
 // 欢迎页：第一次打开时输入昵称（全班唯一）。已经有昵称的老玩家直接进游戏。
 // 连不上排行榜时也放行：昵称先存在本机，等下次上榜时再向服务器确认。
-import { STORAGE_KEYS, MAX } from './config.js?v=c9d81fa9';
-import { store } from './skin.js?v=33e28a2f';
-import { paintLevel } from './draw.js?v=bb1ec1aa';
-import { state } from './state.js?v=7580895e';
+import { STORAGE_KEYS, MAX } from './config.js?v=cc9230d0';
+import { store } from './skin.js?v=4723788e';
+import { paintLevel } from './draw.js?v=312b01fb';
+import { state } from './state.js?v=0eefd06e';
 import { $ } from './dom.js?v=5b57db68';
-import { leaderboardEnabled, claimName, cleanName, canPersist } from './leaderboard.js?v=21f8d08e';
-import { makeAvatar, avatarEl } from './avatar.js?v=a97979a3';
-import { uploadAvatar } from './profile.js?v=ded5ee45';
+import { leaderboardEnabled, claimName, cleanName, canPersist } from './leaderboard.js?v=c18f727f';
+import { makeAvatar, avatarEl } from './avatar.js?v=f69b1bf0';
+import { uploadAvatar } from './profile.js?v=bc3b2c02';
 
 export const needsWelcome = () => leaderboardEnabled() && !store.get(STORAGE_KEYS.playerName);
 

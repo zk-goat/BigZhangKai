@@ -1,6 +1,6 @@
 // 合成反馈：光圈、碎片、飘字、震屏、连击提示。只负责“看起来爽”，不影响玩法。
-import { LEVELS, FIELD, COLORS } from './config.js?v=c9d81fa9';
-import { skin } from './skin.js?v=33e28a2f';
+import { LEVELS, FIELD, COLORS } from './config.js?v=cc9230d0';
+import { skin } from './skin.js?v=4723788e';
 import { starPath } from './shine.js?v=8bbb7766';
 
 const SHAKE_FROM_LEVEL = 7;     // 合到这一级及以上才震屏
@@ -42,10 +42,12 @@ export function mergeEffects({ x, y, lv, gain, combo, now, shiny = false }) {
 }
 
 // 黄金张楷出现：像宝可梦闪光那样在身边炸开一圈闪烁的星星，画面轻轻一亮，弹出一行字
-export function shinyEffects({ x, y, now }) {
-  flashUntil = now + FLASH_MS;
-  bannerAt = now;
-  const n = 14;
+export function shinyEffects({ x, y, now, quiet = false }) {
+  if (!quiet) {  // 遗传延续的黄金张楷不再弹大字、不闪屏
+    flashUntil = now + FLASH_MS;
+    bannerAt = now;
+  }
+  const n = quiet ? 8 : 14;
   const fresh = Array.from({ length: n }, (_, i) => {
     const ang = (Math.PI * 2 * i) / n + Math.random() * 0.3, sp = 1.6 + Math.random() * 2.2;
     return {

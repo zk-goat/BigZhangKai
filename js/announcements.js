@@ -5,7 +5,7 @@ export const ANNOUNCEMENTS = [
     id: '2026-10-03-gold-up',
     date: '10 月 3 日',
     title: '黄金张楷更常见了',
-    items: ['黄金张楷的出现概率翻倍']
+    items: ['黄金张楷的出现概率翻倍', '用它合成，更容易继续是黄金的']
   },
   {
     id: '2026-10-03-weekly',

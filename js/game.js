@@ -58,11 +58,13 @@ export function makeKai(x, y, lv, shiny = false) {
 }
 
 // 闪光张楷出现：计数、记进图鉴、放特效和音效
-function announceShiny(b) {
+// 新出现的：大字 + 星星 + 音效，计入“本局遇到”；遗传延续的：只炸一圈小星星，不重复计数
+function announceShiny(b, inherited = false) {
   if (silent) return;
-  state.shinySeen += 1;
   recordShiny(b.kaiLevel);
-  shinyEffects({ x: b.position.x, y: b.position.y, now: clock() });
+  shinyEffects({ x: b.position.x, y: b.position.y, now: clock(), quiet: inherited });
+  if (inherited) return;
+  state.shinySeen += 1;
   sfx.shiny();
 }
 
@@ -110,7 +112,7 @@ function mergePair(a, b) {
     return;
   }
   mergeEffects({ x, y, lv, gain, combo: state.combo, now, shiny: parentShiny || nb.kaiShiny });
-  if (nb.kaiShiny) announceShiny(nb);
+  if (nb.kaiShiny) announceShiny(nb, parentShiny);
   if (lv === MAX && !state.wonThisGame) showWin();
   else sfx.merge(lv, state.combo);
   updateHud();

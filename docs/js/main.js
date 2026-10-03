@@ -1,16 +1,16 @@
 // 启动：加载照片 → 开局 → 绑定按钮。链接带 ?test=win / ?test=over（可加 &score=分数）时直接展示庆祝画面 / 示例战报。
-import { FIELD, MAX } from './config.js?v=c9d81fa9';
-import { initSkin } from './skin.js?v=33e28a2f';
-import { isMuted, toggleMuted } from './audio.js?v=31ef1341';
-import { state } from './state.js?v=7580895e';
-import { copyShare, gameOver } from './report.js?v=7755e36e';
-import { startGame, restoreGame, loop, fit, bindInput, makeKai, debugSnapshot, simulateGames } from './game.js?v=c8642a49';
-import { readSave } from './save.js?v=c1657aee';
-import { bindRankboard, flushPending } from './rankboard.js?v=65575f93';
-import { bindWelcome, showWelcomeIfNeeded, needsWelcome } from './welcome.js?v=55f7ec9e';
-import { bindNotice, showNoticeIfNew } from './notice.js?v=8a9b10eb';
-import { bindGuestbook } from './guestbook.js?v=407fa702';
-import { syncMyAvatar } from './profile.js?v=ded5ee45';
+import { FIELD, MAX } from './config.js?v=cc9230d0';
+import { initSkin } from './skin.js?v=4723788e';
+import { isMuted, toggleMuted } from './audio.js?v=d5a3af5f';
+import { state } from './state.js?v=0eefd06e';
+import { copyShare, gameOver } from './report.js?v=bcbcbabb';
+import { startGame, restoreGame, loop, fit, bindInput, makeKai, debugSnapshot, simulateGames } from './game.js?v=1d7a0e37';
+import { readSave } from './save.js?v=510d9fb7';
+import { bindRankboard, flushPending } from './rankboard.js?v=399b1081';
+import { bindWelcome, showWelcomeIfNeeded, needsWelcome } from './welcome.js?v=321c9d9e';
+import { bindNotice, showNoticeIfNew } from './notice.js?v=f8349fbe';
+import { bindGuestbook } from './guestbook.js?v=427f52ce';
+import { syncMyAvatar } from './profile.js?v=bc3b2c02';
 import { $ } from './dom.js?v=5b57db68';
 
 function renderSoundBtn() {
@@ -45,7 +45,7 @@ function bindButtons() {
 
 function runTestHooks() {
   const q = location.search;
-  if (/[?&]debug/.test(q)) Object.assign(window, { zkDebug: debugSnapshot, zkSim: simulateGames });
+  if (/[?&]debug/.test(q)) Object.assign(window, { zkDebug: debugSnapshot, zkSim: simulateGames, zkSpawn: makeKai });
   if (/[?&]test=win/.test(q)) {
     makeKai(FIELD.width / 2 - 60, 250, MAX - 1);
     makeKai(FIELD.width / 2 + 60, 250, MAX - 1);

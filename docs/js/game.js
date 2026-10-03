@@ -1,16 +1,16 @@
 // 游戏本体：物理世界、投放、合成、判负、主循环、画面适配和输入。
-import { LEVELS, MAX, FIELD, PHYSICS, RULES, COLORS } from './config.js?v=c9d81fa9';
-import { skin, shapeFor, halfWidth } from './skin.js?v=33e28a2f';
+import { LEVELS, MAX, FIELD, PHYSICS, RULES, COLORS } from './config.js?v=cc9230d0';
+import { skin, shapeFor, halfWidth } from './skin.js?v=4723788e';
 import { popScale } from './geometry.js?v=6bdd869a';
-import { spawnWeights, pickLevel } from './spawn.js?v=b764205f';
-import { rollShiny, shinyMultiplier } from './variant.js?v=a466cba0';
-import { recordShiny } from './dex.js?v=223fc645';
-import { drawKai } from './draw.js?v=bb1ec1aa';
-import { sfx, unlockAudio } from './audio.js?v=31ef1341';
-import { state, resetRound, addScore } from './state.js?v=7580895e';
-import { resetEffects, mergeEffects, shinyEffects, applyShake, drawEffects } from './effects.js?v=8567c837';
-import { showWin, gameOver } from './report.js?v=7755e36e';
-import { writeSave, clearSave } from './save.js?v=c1657aee';
+import { spawnWeights, pickLevel } from './spawn.js?v=217193c4';
+import { rollShiny, shinyMultiplier } from './variant.js?v=f97f2e66';
+import { recordShiny } from './dex.js?v=38e79336';
+import { drawKai } from './draw.js?v=312b01fb';
+import { sfx, unlockAudio } from './audio.js?v=d5a3af5f';
+import { state, resetRound, addScore } from './state.js?v=0eefd06e';
+import { resetEffects, mergeEffects, shinyEffects, applyShake, drawEffects } from './effects.js?v=6e56e6b6';
+import { showWin, gameOver } from './report.js?v=bcbcbabb';
+import { writeSave, clearSave } from './save.js?v=510d9fb7';
 
 const { Engine, Bodies, Composite, Events, Body } = Matter;
 const W = FIELD.width, H = FIELD.height;
@@ -58,11 +58,13 @@ export function makeKai(x, y, lv, shiny = false) {
 }
 
 // 闪光张楷出现：计数、记进图鉴、放特效和音效
-function announceShiny(b) {
+// 新出现的：大字 + 星星 + 音效，计入“本局遇到”；遗传延续的：只炸一圈小星星，不重复计数
+function announceShiny(b, inherited = false) {
   if (silent) return;
-  state.shinySeen += 1;
   recordShiny(b.kaiLevel);
-  shinyEffects({ x: b.position.x, y: b.position.y, now: clock() });
+  shinyEffects({ x: b.position.x, y: b.position.y, now: clock(), quiet: inherited });
+  if (inherited) return;
+  state.shinySeen += 1;
   sfx.shiny();
 }
 
@@ -110,7 +112,7 @@ function mergePair(a, b) {
     return;
   }
   mergeEffects({ x, y, lv, gain, combo: state.combo, now, shiny: parentShiny || nb.kaiShiny });
-  if (nb.kaiShiny) announceShiny(nb);
+  if (nb.kaiShiny) announceShiny(nb, parentShiny);
   if (lv === MAX && !state.wonThisGame) showWin();
   else sfx.merge(lv, state.combo);
   updateHud();

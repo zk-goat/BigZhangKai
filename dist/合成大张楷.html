@@ -507,7 +507,7 @@ const SPAWN = [
 
 // 黄金张楷（代码里叫 shiny）：每个新出现的张楷（投放或合成产物）都有 chance 的概率是黄金的；
 // 用黄金张楷合成时结果按 inherit 概率保留；scoreMul 是有黄金张楷参与的那次合成的得分倍率
-const SHINY = { chance: 0.01, inherit: 0.5, scoreMul: 2 };   // 1%：一局大约遇到 4～5 个
+const SHINY = { chance: 0.01, inherit: 0.75, scoreMul: 2 };  // 1%：一局大约遇到 4～5 个；75% 遗传：平均能往上带 4 级
 
 // 照片转碰撞轮廓
 const TRACE = {
@@ -1877,10 +1877,12 @@ function mergeEffects({ x, y, lv, gain, combo, now, shiny = false }) {
 }
 
 // 黄金张楷出现：像宝可梦闪光那样在身边炸开一圈闪烁的星星，画面轻轻一亮，弹出一行字
-function shinyEffects({ x, y, now }) {
-  flashUntil = now + FLASH_MS;
-  bannerAt = now;
-  const n = 14;
+function shinyEffects({ x, y, now, quiet = false }) {
+  if (!quiet) {  // 遗传延续的黄金张楷不再弹大字、不闪屏
+    flashUntil = now + FLASH_MS;
+    bannerAt = now;
+  }
+  const n = quiet ? 8 : 14;
   const fresh = Array.from({ length: n }, (_, i) => {
     const ang = (Math.PI * 2 * i) / n + Math.random() * 0.3, sp = 1.6 + Math.random() * 2.2;
     return {
@@ -2041,11 +2043,13 @@ function makeKai(x, y, lv, shiny = false) {
 }
 
 // 闪光张楷出现：计数、记进图鉴、放特效和音效
-function announceShiny(b) {
+// 新出现的：大字 + 星星 + 音效，计入“本局遇到”；遗传延续的：只炸一圈小星星，不重复计数
+function announceShiny(b, inherited = false) {
   if (silent) return;
-  state.shinySeen += 1;
   recordShiny(b.kaiLevel);
-  shinyEffects({ x: b.position.x, y: b.position.y, now: clock() });
+  shinyEffects({ x: b.position.x, y: b.position.y, now: clock(), quiet: inherited });
+  if (inherited) return;
+  state.shinySeen += 1;
   sfx.shiny();
 }
 
@@ -2093,7 +2097,7 @@ function mergePair(a, b) {
     return;
   }
   mergeEffects({ x, y, lv, gain, combo: state.combo, now, shiny: parentShiny || nb.kaiShiny });
-  if (nb.kaiShiny) announceShiny(nb);
+  if (nb.kaiShiny) announceShiny(nb, parentShiny);
   if (lv === MAX && !state.wonThisGame) showWin();
   else sfx.merge(lv, state.combo);
   updateHud();
@@ -2454,7 +2458,7 @@ const ANNOUNCEMENTS = [
     id: '2026-10-03-gold-up',
     date: '10 月 3 日',
     title: '黄金张楷更常见了',
-    items: ['黄金张楷的出现概率翻倍']
+    items: ['黄金张楷的出现概率翻倍', '用它合成，更容易继续是黄金的']
   },
   {
     id: '2026-10-03-weekly',
@@ -2726,7 +2730,7 @@ function bindButtons() {
 
 function runTestHooks() {
   const q = location.search;
-  if (/[?&]debug/.test(q)) Object.assign(window, { zkDebug: debugSnapshot, zkSim: simulateGames });
+  if (/[?&]debug/.test(q)) Object.assign(window, { zkDebug: debugSnapshot, zkSim: simulateGames, zkSpawn: makeKai });
   if (/[?&]test=win/.test(q)) {
     makeKai(FIELD.width / 2 - 60, 250, MAX - 1);
     makeKai(FIELD.width / 2 + 60, 250, MAX - 1);
