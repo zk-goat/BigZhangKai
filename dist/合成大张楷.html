@@ -1027,7 +1027,7 @@ function drawKai(ctx, x, y, r, lv, angle = 0, shiny = false) {
   ctx.restore();
 }
 
-function drawPhoto(ctx, r, lv, { s, sh, top, bottom, verts }, img, shiny) {
+function drawPhoto(ctx, r, lv, { s, sh, bottom, verts }, img, shiny) {
   const x = -sh.cx * s, y = -sh.cy * s, w = sh.w * s, h = sh.h * s;
   if (shiny) {
     const t = performance.now() / 1000;
@@ -1039,7 +1039,11 @@ function drawPhoto(ctx, r, lv, { s, sh, top, bottom, verts }, img, shiny) {
     ctx.shadowColor = 'transparent';
   }
   if (r >= NAME_MIN_R) drawName(ctx, r, lv, bottom * 0.45);
-  if (lv === MAX) { ctx.translate(0, top + r * 0.98); drawCrown(ctx, r); }
+  if (lv === MAX) {
+    // 第 14 级照片的人头偏左，皇冠跟着照片里的头走，而不是跟着整张照片的重心走。
+    ctx.translate(x + w * 0.29, y + h * 0.055);
+    drawCrown(ctx, w * 0.35);
+  }
 }
 
 function drawBall(ctx, r, lv, shiny) {
@@ -1050,7 +1054,10 @@ function drawBall(ctx, r, lv, shiny) {
   ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.lineWidth = 2; ctx.strokeStyle = COLORS.ink; ctx.stroke();
   if (r >= NAME_MIN_R) drawName(ctx, r, lv, r * 0.62);
-  if (lv === MAX) drawCrown(ctx, r);
+  if (lv === MAX) {
+    ctx.translate(0, -r * 0.9);
+    drawCrown(ctx, r * 0.9);
+  }
 }
 
 function drawName(ctx, r, lv, y) {
@@ -1076,15 +1083,55 @@ function drawFace(ctx, r) {
   ctx.beginPath(); ctx.arc(0, r * 0.12, r * 0.16, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
 }
 
-function drawCrown(ctx, r) {
-  const w = r * 0.9, h = r * 0.38, y = -r * 0.98;
+function drawCrown(ctx, width) {
+  ctx.save();
+  ctx.rotate(-0.07);
+  ctx.scale(width, width);
+  // 用归一化坐标画，游戏内、庆祝页和战报上的小图都能保持同一比例。
   ctx.beginPath();
-  ctx.moveTo(-w / 2, y);
-  ctx.lineTo(-w / 2, y - h); ctx.lineTo(-w / 4, y - h * 0.45);
-  ctx.lineTo(0, y - h * 1.15); ctx.lineTo(w / 4, y - h * 0.45);
-  ctx.lineTo(w / 2, y - h); ctx.lineTo(w / 2, y); ctx.closePath();
-  ctx.fillStyle = COLORS.crown; ctx.fill();
-  ctx.lineWidth = 2; ctx.strokeStyle = COLORS.ink; ctx.stroke();
+  ctx.moveTo(-0.5, -0.11);
+  ctx.lineTo(-0.48, -0.43);
+  ctx.quadraticCurveTo(-0.47, -0.48, -0.43, -0.44);
+  ctx.lineTo(-0.22, -0.29);
+  ctx.lineTo(-0.04, -0.57);
+  ctx.quadraticCurveTo(0, -0.63, 0.04, -0.57);
+  ctx.lineTo(0.22, -0.29);
+  ctx.lineTo(0.43, -0.44);
+  ctx.quadraticCurveTo(0.47, -0.48, 0.48, -0.43);
+  ctx.lineTo(0.5, -0.11);
+  ctx.quadraticCurveTo(0, 0.03, -0.5, -0.11);
+  ctx.closePath();
+  const gold = ctx.createLinearGradient(0, -0.62, 0, 0.03);
+  gold.addColorStop(0, '#fff4b5');
+  gold.addColorStop(0.45, COLORS.crown);
+  gold.addColorStop(1, '#b87412');
+  ctx.fillStyle = gold;
+  ctx.shadowColor = 'rgba(77,41,7,.35)';
+  ctx.shadowBlur = 0.08;
+  ctx.shadowOffsetY = 0.04;
+  ctx.fill();
+  ctx.shadowColor = 'transparent';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = 0.035;
+  ctx.strokeStyle = '#835013';
+  ctx.stroke();
+
+  // 下沿的亮边和中央红宝石让小尺寸的皇冠也有层次。
+  ctx.beginPath();
+  ctx.moveTo(-0.46, -0.13);
+  ctx.quadraticCurveTo(0, -0.01, 0.46, -0.13);
+  ctx.lineWidth = 0.035;
+  ctx.strokeStyle = '#fff4bd';
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(0, -0.17, 0.065, 0.075, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#a92827';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(-0.02, -0.2, 0.018, 0, Math.PI * 2);
+  ctx.fillStyle = '#fff1dc';
+  ctx.fill();
+  ctx.restore();
 }
 
 // 把某一级画进一个独立小画布（战报大图、进度格、庆祝画面、设置面板）
@@ -2826,6 +2873,12 @@ function bindWelcome() {
 // 更新公告：最新的放最前面，id 不能重复（没看过最新一条的玩家打开游戏会自动弹出）。
 // 写法：每条一句话、只说有什么新东西，不解释原理。
 const ANNOUNCEMENTS = [
+  {
+    id: '2026-10-04-crown',
+    date: '10 月 4 日',
+    title: '大张楷换新皇冠',
+    items: ['皇冠更精致，也戴正了']
+  },
   {
     id: '2026-10-04-group',
     date: '10 月 4 日',

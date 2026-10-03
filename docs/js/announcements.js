@@ -2,6 +2,12 @@
 // 写法：每条一句话、只说有什么新东西，不解释原理。
 export const ANNOUNCEMENTS = [
   {
+    id: '2026-10-04-crown',
+    date: '10 月 4 日',
+    title: '大张楷换新皇冠',
+    items: ['皇冠更精致，也戴正了']
+  },
+  {
     id: '2026-10-04-group',
     date: '10 月 4 日',
     title: '微信群入口',

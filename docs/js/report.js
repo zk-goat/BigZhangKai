@@ -1,7 +1,7 @@
 // 结算：战报卡、本机前 5、复制战绩，以及合出大张楷时的庆祝画面。
 import { LEVELS, MAX, STORAGE_KEYS, SHARE_URL } from './config.js?v=21648a52';
 import { skin, store } from './skin.js?v=83f93ead';
-import { paintLevel } from './draw.js?v=cfa45ce3';
+import { paintLevel } from './draw.js?v=8453b96a';
 import { sfx } from './audio.js?v=b9710e55';
 import { state } from './state.js?v=5f7e2107';
 import { onRoundOver } from './rankboard.js?v=c9fb7455';
