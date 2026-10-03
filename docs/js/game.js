@@ -1,16 +1,17 @@
 // 游戏本体：物理世界、投放、合成、判负、主循环、画面适配和输入。
-import { LEVELS, MAX, FIELD, PHYSICS, RULES, COLORS } from './config.js?v=cc9230d0';
-import { skin, shapeFor, halfWidth } from './skin.js?v=4723788e';
+import { LEVELS, MAX, FIELD, PHYSICS, RULES, COLORS } from './config.js?v=21648a52';
+import { skin, shapeFor, halfWidth } from './skin.js?v=83f93ead';
 import { popScale } from './geometry.js?v=6bdd869a';
-import { spawnWeights, pickLevel } from './spawn.js?v=217193c4';
-import { rollShiny, shinyMultiplier } from './variant.js?v=f97f2e66';
-import { recordShiny } from './dex.js?v=38e79336';
-import { drawKai } from './draw.js?v=312b01fb';
-import { sfx, unlockAudio } from './audio.js?v=d5a3af5f';
-import { state, resetRound, addScore } from './state.js?v=0eefd06e';
-import { resetEffects, mergeEffects, shinyEffects, applyShake, drawEffects } from './effects.js?v=6e56e6b6';
-import { showWin, gameOver } from './report.js?v=bcbcbabb';
-import { writeSave, clearSave } from './save.js?v=510d9fb7';
+import { spawnWeights, pickLevel } from './spawn.js?v=a6189f3b';
+import { rollShiny, shinyMultiplier } from './variant.js?v=740b3325';
+import { recordShiny } from './dex.js?v=2f5cb32a';
+import { onMerge, onShiny, onFuse, onBoard, resetRoundStats, roundStats } from './achievements.js?v=6e59b0e1';
+import { drawKai } from './draw.js?v=cfa45ce3';
+import { sfx, unlockAudio } from './audio.js?v=b9710e55';
+import { state, resetRound, addScore } from './state.js?v=5f7e2107';
+import { resetEffects, mergeEffects, shinyEffects, fuseEffects, floatScore, applyShake, drawEffects } from './effects.js?v=b141fbba';
+import { showWin, gameOver } from './report.js?v=23fbacbe';
+import { writeSave, clearSave } from './save.js?v=17e3bab3';
 
 const { Engine, Bodies, Composite, Events, Body } = Matter;
 const W = FIELD.width, H = FIELD.height;
@@ -62,6 +63,7 @@ export function makeKai(x, y, lv, shiny = false) {
 function announceShiny(b, inherited = false) {
   if (silent) return;
   recordShiny(b.kaiLevel);
+  onShiny({ lv: b.kaiLevel, fresh: !inherited });
   shinyEffects({ x: b.position.x, y: b.position.y, now: clock(), quiet: inherited });
   if (inherited) return;
   state.shinySeen += 1;
@@ -71,13 +73,13 @@ function announceShiny(b, inherited = false) {
 // ---------- 合成 ----------
 function onCollide(ev) {
   ev.pairs.forEach(({ bodyA: a, bodyB: b }) => {
-    if (isKai(a) && isKai(b) && !a.merged && !b.merged && a.kaiLevel === b.kaiLevel && a.kaiLevel < MAX) mergePair(a, b);
+    if (isKai(a) && isKai(b) && !a.merged && !b.merged && a.kaiLevel === b.kaiLevel) mergePair(a, b);
   });
 }
 
 // 照片轮廓不规则，光靠碰撞常差一条缝：同级重心够近也算碰到
 function mergeNearby() {
-  const bodies = kaiBodies().filter(b => !b.merged && b.kaiLevel < MAX);
+  const bodies = kaiBodies().filter(b => !b.merged);
   for (let i = 0; i < bodies.length; i++) {
     for (let j = i + 1; j < bodies.length; j++) {
       const a = bodies[i], b = bodies[j];
@@ -89,7 +91,28 @@ function mergeNearby() {
   }
 }
 
+// 危险线：每次大张楷合体后往下移一点，可用空间越来越小
+const dangerY = () => FIELD.dangerY + state.dangerShift;
+
+// 两个大张楷合体：一起消失，奖励分数，危险线下移
+function fuseMax(a, b) {
+  a.merged = b.merged = true;
+  const x = (a.position.x + b.position.x) / 2, y = (a.position.y + b.position.y) / 2;
+  Composite.remove(state.engine.world, [a, b]);
+  state.fusions += 1;
+  state.mergeCount += 1;
+  state.dangerShift = Math.min(RULES.fuseDangerMax, state.dangerShift + RULES.fuseDangerStep);
+  addScore(RULES.fuseBonus);
+  if (silent) return;
+  fuseEffects({ x, y, now: clock() });
+  floatScore(x, y, RULES.fuseBonus);
+  sfx.win();
+  onFuse({ fusions: state.fusions, score: state.score });
+  updateHud();
+}
+
 function mergePair(a, b) {
+  if (a.kaiLevel === MAX) { fuseMax(a, b); return; }
   const lv = a.kaiLevel + 1, now = clock();
   a.merged = b.merged = true;
   const x = (a.position.x + b.position.x) / 2, y = (a.position.y + b.position.y) / 2;
@@ -113,6 +136,8 @@ function mergePair(a, b) {
   }
   mergeEffects({ x, y, lv, gain, combo: state.combo, now, shiny: parentShiny || nb.kaiShiny });
   if (nb.kaiShiny) announceShiny(nb, parentShiny);
+  onMerge({ lv, combo: state.combo, score: state.score, shiny: nb.kaiShiny, playedMs: Date.now() - state.startedAt });
+  onBoard(levelCounts());
   if (lv === MAX && !state.wonThisGame) showWin();
   else sfx.merge(lv, state.combo);
   updateHud();
@@ -140,6 +165,7 @@ export function drop() {
   const dropped = makeKai(clampAim(state.current), FIELD.dropY, state.current, state.currentShiny);
   sfx.drop();
   if (dropped.kaiShiny) announceShiny(dropped);
+  onBoard(levelCounts());
   state.current = state.next;
   state.currentShiny = state.nextShiny;
   state.next = randLevel();
@@ -151,7 +177,7 @@ export function drop() {
 
 function checkDanger(now) {
   const risky = kaiBodies().some(b =>
-    now - b.bornAt > RULES.dangerGraceMs && b.bounds.min.y < FIELD.dangerY && Math.abs(b.velocity.y) < 1.2);
+    now - b.bornAt > RULES.dangerGraceMs && b.bounds.min.y < dangerY() && Math.abs(b.velocity.y) < 1.2);
   if (!risky) { state.dangerSince = 0; return; }
   if (!state.dangerSince) state.dangerSince = now;
   if (now - state.dangerSince > RULES.dangerHoldMs) gameOver();
@@ -236,6 +262,7 @@ export function startGame() {
   state.next = randLevel();
   state.currentShiny = rollShiny();
   state.nextShiny = rollShiny();
+  resetRoundStats();
   clearSave();
   updateHud();
 }
@@ -254,6 +281,7 @@ function snapshotGame() {
       score: state.score, topLevel: state.topLevel, current: state.current, next: state.next,
       mergeCount: state.mergeCount, maxCombo: state.maxCombo, wonThisGame: state.wonThisGame,
       currentShiny: state.currentShiny, nextShiny: state.nextShiny, shinySeen: state.shinySeen,
+      fusions: state.fusions, dangerShift: state.dangerShift, round: roundStats(),
       playedMs: Date.now() - state.startedAt
     }
   };
@@ -268,7 +296,8 @@ export function saveNow() {
 // 按存档摆回每个张楷；刚恢复的张楷重新享受越线缓冲，不会一打开就判负
 export function restoreGame(save) {
   enterRound(newEngine());
-  const { playedMs, wonThisGame, ...rest } = save.state;
+  const { playedMs, wonThisGame, round, ...rest } = save.state;
+  resetRoundStats(round);
   Object.assign(state, rest, { wonThisGame, startedAt: Date.now() - playedMs });
   save.bodies.forEach(({ lv, x, y, angle, shiny }) => Body.setAngle(makeKai(x, y, lv, shiny), angle));
   updateHud();
@@ -287,7 +316,7 @@ function draw(now) {
     ? (Math.sin(now / 80) > 0 ? COLORS.accent : 'rgba(226,73,47,.3)')
     : 'rgba(59,42,20,.25)';
   ctx.setLineDash([8, 6]); ctx.strokeStyle = warn; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(0, FIELD.dangerY); ctx.lineTo(W, FIELD.dangerY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, dangerY()); ctx.lineTo(W, dangerY()); ctx.stroke();
   ctx.setLineDash([]);
 
   if (!state.over) {

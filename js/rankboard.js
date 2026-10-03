@@ -6,6 +6,7 @@ import { state } from './state.js';
 import { $ } from './dom.js';
 import { leaderboardEnabled, fetchTop, myWeekRank, submitScore, claimName, cleanName, canPersist } from './leaderboard.js';
 import { weekKey, daysLeft } from './week.js';
+import { onWeekRank } from './achievements.js';
 import { avatarEl, makeAvatar } from './avatar.js';
 import { myAvatar, uploadAvatar, renderMeBar } from './profile.js';
 
@@ -65,6 +66,11 @@ function renderList(rows) {
     const face = avatarEl(r.name, r.avatar, 32);
     const who = document.createElement('span'); who.className = 'who';
     const nm = document.createElement('b'); nm.textContent = r.name;
+    if (r.badges > 0) {
+      const badge = document.createElement('span'); badge.className = 'badge-count'; badge.textContent = '🏆' + r.badges;
+      badge.title = `解锁了 ${r.badges} 个成就`;
+      nm.append(badge);
+    }
     const lv = document.createElement('small');
     lv.textContent = (skin[r.top_level] ? skin[r.top_level].name : '') + ' · '
       + new Date(r.created_at).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
@@ -197,6 +203,7 @@ async function autoUpload(reclaimed = false) {
       return;
     }
     const wr = await myWeekRank().catch(() => null);
+    onWeekRank(wr);
     const ranks = (wr ? `本周第 ${wr} 名，` : '') + `总榜第 ${rank} 名`;
     setMsg(toSend !== run ? `已补传之前的 ${toSend.score} 分：${ranks}`
       : isRecord ? `新纪录！${ranks}` : `已上榜：${ranks}`);

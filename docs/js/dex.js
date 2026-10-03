@@ -1,6 +1,6 @@
 // 闪光图鉴：本机见过哪些等级的闪光张楷。只存在本机。
-import { MAX, STORAGE_KEYS } from './config.js?v=cc9230d0';
-import { store } from './skin.js?v=4723788e';
+import { MAX, STORAGE_KEYS } from './config.js?v=21648a52';
+import { store } from './skin.js?v=83f93ead';
 
 export function loadDex() {
   try {

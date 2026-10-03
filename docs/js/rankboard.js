@@ -1,13 +1,14 @@
 // 排行榜界面：顶栏“排行榜”弹窗 + 战报卡上的自动上榜。
 // 第一次结束时占一个昵称（全班唯一），以后每局结束自动上传；破了自己本周最好成绩才传（历史最高自然也在里面）。
-import { STORAGE_KEYS } from './config.js?v=cc9230d0';
-import { skin, store } from './skin.js?v=4723788e';
-import { state } from './state.js?v=0eefd06e';
+import { STORAGE_KEYS } from './config.js?v=21648a52';
+import { skin, store } from './skin.js?v=83f93ead';
+import { state } from './state.js?v=5f7e2107';
 import { $ } from './dom.js?v=5b57db68';
-import { leaderboardEnabled, fetchTop, myWeekRank, submitScore, claimName, cleanName, canPersist } from './leaderboard.js?v=c18f727f';
+import { leaderboardEnabled, fetchTop, myWeekRank, submitScore, claimName, cleanName, canPersist } from './leaderboard.js?v=feae38ca';
 import { weekKey, daysLeft } from './week.js?v=8858cfea';
-import { avatarEl, makeAvatar } from './avatar.js?v=f69b1bf0';
-import { myAvatar, uploadAvatar, renderMeBar } from './profile.js?v=bc3b2c02';
+import { onWeekRank } from './achievements.js?v=6e59b0e1';
+import { avatarEl, makeAvatar } from './avatar.js?v=a2dafd4d';
+import { myAvatar, uploadAvatar, renderMeBar } from './profile.js?v=f8ea613e';
 
 const playerName = () => store.get(STORAGE_KEYS.playerName) || '';
 const uploadedBest = () => Number(store.get(STORAGE_KEYS.uploadedBest)) || 0;
@@ -65,6 +66,11 @@ function renderList(rows) {
     const face = avatarEl(r.name, r.avatar, 32);
     const who = document.createElement('span'); who.className = 'who';
     const nm = document.createElement('b'); nm.textContent = r.name;
+    if (r.badges > 0) {
+      const badge = document.createElement('span'); badge.className = 'badge-count'; badge.textContent = '🏆' + r.badges;
+      badge.title = `解锁了 ${r.badges} 个成就`;
+      nm.append(badge);
+    }
     const lv = document.createElement('small');
     lv.textContent = (skin[r.top_level] ? skin[r.top_level].name : '') + ' · '
       + new Date(r.created_at).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
@@ -197,6 +203,7 @@ async function autoUpload(reclaimed = false) {
       return;
     }
     const wr = await myWeekRank().catch(() => null);
+    onWeekRank(wr);
     const ranks = (wr ? `本周第 ${wr} 名，` : '') + `总榜第 ${rank} 名`;
     setMsg(toSend !== run ? `已补传之前的 ${toSend.score} 分：${ranks}`
       : isRecord ? `新纪录！${ranks}` : `已上榜：${ranks}`);

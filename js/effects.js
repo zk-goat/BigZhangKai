@@ -9,14 +9,14 @@ const MAX_PARTICLES = 260;
 
 let rings = [], particles = [], floats = [];
 let shakeUntil = 0, shakeAmp = 0, comboText = '', comboUntil = 0;
-let flashUntil = 0, bannerAt = -Infinity;
 const FLASH_MS = 300, BANNER_MS = 1300;
+let flashUntil = 0, bannerAt = -Infinity, bannerText = '', bannerSize = 32, flashAlpha = 0.22, bannerMs = BANNER_MS;
 const GOLDS = ['#ffd54a', '#ffe9a0', '#f2b705', '#fff6d6', '#e8a400'];
 const SPARKLE_COLORS = ['#ffffff', '#fff3b0', '#ffd54a', '#ffffff', '#ffe0f0', '#d8f4ff'];
 
 export function resetEffects() {
   rings = []; particles = []; floats = [];
-  shakeUntil = 0; comboUntil = 0; flashUntil = 0; bannerAt = -Infinity;
+  shakeUntil = 0; comboUntil = 0; flashUntil = 0; bannerAt = -Infinity; bannerText = '';
 }
 
 export function mergeEffects({ x, y, lv, gain, combo, now, shiny = false }) {
@@ -46,6 +46,7 @@ export function shinyEffects({ x, y, now, quiet = false }) {
   if (!quiet) {  // 遗传延续的黄金张楷不再弹大字、不闪屏
     flashUntil = now + FLASH_MS;
     bannerAt = now;
+    bannerText = '黄金张楷！'; bannerSize = 32; flashAlpha = 0.22; bannerMs = BANNER_MS;
   }
   const n = quiet ? 8 : 14;
   const fresh = Array.from({ length: n }, (_, i) => {
@@ -58,28 +59,48 @@ export function shinyEffects({ x, y, now, quiet = false }) {
   particles = [...particles, ...fresh].slice(-MAX_PARTICLES);
 }
 
+// 两个大张楷合体：更大的字、更亮的闪光、彩色加金色的大爆发、震屏
+export function fuseEffects({ x, y, now }) {
+  flashUntil = now + FLASH_MS * 2;
+  bannerAt = now;
+  bannerText = '张楷，合体！'; bannerSize = 40; flashAlpha = 0.45; bannerMs = 2000;  // 难得的大场面，字幕多停一会儿
+  shakeUntil = now + 500; shakeAmp = 9;
+  const n = 48;
+  const fresh = Array.from({ length: n }, (_, i) => {
+    const ang = (Math.PI * 2 * i) / n + Math.random() * 0.2, sp = 3 + Math.random() * 6;
+    return { x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 2, life: 1, star: i % 3 === 0,
+      size: i % 3 === 0 ? 7 + Math.random() * 6 : 3 + Math.random() * 4,
+      color: i % 2 ? GOLDS[i % GOLDS.length] : LEVELS[i % LEVELS.length].color, spin: Math.random() * 6 };
+  });
+  particles = [...particles, ...fresh].slice(-MAX_PARTICLES);
+}
+
 function drawShinyBanner(ctx, now) {
   const age = now - bannerAt;
-  if (age < 0 || age > BANNER_MS) return;
-  const inP = Math.min(1, age / 220), outP = Math.max(0, (age - (BANNER_MS - 350)) / 350);
+  if (age < 0 || age > bannerMs) return;
+  const inP = Math.min(1, age / 220), outP = Math.max(0, (age - (bannerMs - 350)) / 350);
   const scale = 0.7 + 0.3 * (1 - Math.pow(1 - inP, 3));
   ctx.save();
   ctx.globalAlpha = 1 - outP;
   ctx.translate(FIELD.width / 2, FIELD.height * 0.3 - 10 * inP);
   ctx.scale(scale, scale);
-  ctx.font = '32px "ZCOOL KuaiLe", sans-serif';
+  ctx.font = `${bannerSize}px "ZCOOL KuaiLe", sans-serif`;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const g = ctx.createLinearGradient(0, -16, 0, 16);
   g.addColorStop(0, '#fffdf0'); g.addColorStop(0.4, '#ffe14d'); g.addColorStop(0.75, '#ffb000'); g.addColorStop(1, '#ff8a00');
   ctx.shadowColor = 'rgba(255,255,255,.9)'; ctx.shadowBlur = 14;   // 外圈白色辉光
   ctx.lineWidth = 6; ctx.strokeStyle = '#5a2e00';
-  ctx.strokeText('黄金张楷！', 0, 0);
+  ctx.strokeText(bannerText, 0, 0);
   ctx.shadowBlur = 0;
   ctx.fillStyle = g;
-  ctx.fillText('黄金张楷！', 0, 0);
+  ctx.fillText(bannerText, 0, 0);
   ctx.lineWidth = 1.2; ctx.strokeStyle = 'rgba(255,255,255,.8)';    // 字面一圈细亮边
-  ctx.strokeText('黄金张楷！', 0, -1);
+  ctx.strokeText(bannerText, 0, -1);
   ctx.restore();
+}
+
+export function floatScore(x, y, gain) {
+  floats = [...floats, { x, y, text: '+' + gain, t: 0 }];
 }
 
 // 在画面最开始调用：震屏偏移
@@ -141,7 +162,7 @@ export function drawEffects(ctx, now) {
     }
   });
   if (now < flashUntil) {
-    ctx.fillStyle = `rgba(255,248,215,${0.22 * (flashUntil - now) / FLASH_MS})`;
+    ctx.fillStyle = `rgba(255,248,215,${flashAlpha * Math.min(1, (flashUntil - now) / FLASH_MS)})`;
     ctx.fillRect(-20, -20, FIELD.width + 40, FIELD.height + 40);
   }
   drawShinyBanner(ctx, now);

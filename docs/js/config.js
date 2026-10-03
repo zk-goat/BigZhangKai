@@ -47,6 +47,9 @@ export const RULES = {
   dangerHoldMs: 2000,      // 越线持续多久判负
   comboWindowMs: 1200,
   winBonus: 200,
+  fuseBonus: 1000,         // 两个大张楷合体的奖励分
+  fuseDangerStep: 15,      // 每合体一次，危险线下移多少（越来越难，防止无限刷）
+  fuseDangerMax: 90,       // 危险线最多下移多少
   scoreScale: 1.75,        // 每次合成得分倍率：后期掉大张楷后合成次数变少，按此补回，让新老成绩可比
   tallCap: 2.4             // 细长照片最长边不超过 半径 × 这个倍数
 };
@@ -97,7 +100,9 @@ export const STORAGE_KEYS = {
   noticeSeen: 'dazhangkai-notice-seen',
   dex: 'dazhangkai-shiny-dex',
   avatar: 'dazhangkai-avatar',
-  weekBest: 'dazhangkai-week-best'
+  weekBest: 'dazhangkai-week-best',
+  achievements: 'dazhangkai-achievements',
+  gamesPlayed: 'dazhangkai-games-played'
 };
 
 export const SHARE_URL = 'zk-goat.github.io/BigZhangKai';

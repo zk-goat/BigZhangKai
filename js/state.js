@@ -12,6 +12,8 @@ export const state = {
   currentShiny: false,
   nextShiny: false,
   shinySeen: 0,
+  fusions: 0,       // 本局大张楷合体次数
+  dangerShift: 0,   // 危险线因合体下移了多少
   aimX: FIELD.width / 2,
   canDrop: true,
   over: false,
@@ -30,7 +32,7 @@ export const state = {
 export function resetRound(engine, firstNext) {
   Object.assign(state, {
     engine,
-    score: 0, topLevel: 0, current: 0, next: firstNext, currentShiny: false, nextShiny: false, shinySeen: 0,
+    score: 0, topLevel: 0, current: 0, next: firstNext, currentShiny: false, nextShiny: false, shinySeen: 0, fusions: 0, dangerShift: 0,
     aimX: FIELD.width / 2, canDrop: true, over: false, paused: false, wonThisGame: false,
     dangerSince: 0, mergeCount: 0, maxCombo: 0, startedAt: Date.now(), combo: 0, lastMergeAt: 0
   });

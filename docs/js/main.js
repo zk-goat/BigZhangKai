@@ -1,16 +1,18 @@
 // 启动：加载照片 → 开局 → 绑定按钮。链接带 ?test=win / ?test=over（可加 &score=分数）时直接展示庆祝画面 / 示例战报。
-import { FIELD, MAX } from './config.js?v=cc9230d0';
-import { initSkin } from './skin.js?v=4723788e';
-import { isMuted, toggleMuted } from './audio.js?v=d5a3af5f';
-import { state } from './state.js?v=0eefd06e';
-import { copyShare, gameOver } from './report.js?v=bcbcbabb';
-import { startGame, restoreGame, loop, fit, bindInput, makeKai, debugSnapshot, simulateGames } from './game.js?v=1d7a0e37';
-import { readSave } from './save.js?v=510d9fb7';
-import { bindRankboard, flushPending } from './rankboard.js?v=399b1081';
-import { bindWelcome, showWelcomeIfNeeded, needsWelcome } from './welcome.js?v=321c9d9e';
-import { bindNotice, showNoticeIfNew } from './notice.js?v=f8349fbe';
-import { bindGuestbook } from './guestbook.js?v=427f52ce';
-import { syncMyAvatar } from './profile.js?v=bc3b2c02';
+import { FIELD, MAX } from './config.js?v=21648a52';
+import { initSkin } from './skin.js?v=83f93ead';
+import { isMuted, toggleMuted } from './audio.js?v=b9710e55';
+import { state } from './state.js?v=5f7e2107';
+import { copyShare, gameOver } from './report.js?v=23fbacbe';
+import { startGame, restoreGame, loop, fit, bindInput, makeKai, debugSnapshot, simulateGames } from './game.js?v=266832ee';
+import { readSave } from './save.js?v=17e3bab3';
+import { bindRankboard, flushPending } from './rankboard.js?v=c9fb7455';
+import { bindWelcome, showWelcomeIfNeeded, needsWelcome } from './welcome.js?v=909b6eb1';
+import { bindNotice, showNoticeIfNew } from './notice.js?v=f8f18094';
+import { bindGuestbook } from './guestbook.js?v=51590444';
+import { syncMyAvatar, syncBadges } from './profile.js?v=f8ea613e';
+import { bindAchievements } from './achieve-ui.js?v=2a181da3';
+import { onMute, unlockedCount } from './achievements.js?v=6e59b0e1';
 import { $ } from './dom.js?v=5b57db68';
 
 function renderSoundBtn() {
@@ -35,11 +37,12 @@ function bindButtons() {
   $('btn-again').addEventListener('click', startGame);
   $('btn-copy').addEventListener('click', copyShare);
   $('btn-continue').addEventListener('click', () => { $('win').hidden = true; state.paused = false; });
-  $('btn-sound').addEventListener('click', () => { toggleMuted(); renderSoundBtn(); });
+  $('btn-sound').addEventListener('click', () => { if (toggleMuted()) onMute(); renderSoundBtn(); });
   bindRankboard();
   bindWelcome();
   bindNotice();
   bindGuestbook();
+  bindAchievements({ onCountChanged: syncBadges });
   renderSoundBtn();
 }
 
@@ -86,6 +89,7 @@ async function boot() {
   runTestHooks();
   flushPending();
   syncMyAvatar();
+  syncBadges(unlockedCount());
   if (document.fonts) document.fonts.ready.then(fit);
 }
 

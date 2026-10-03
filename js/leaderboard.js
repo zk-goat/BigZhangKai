@@ -113,6 +113,11 @@ export async function myProfile() {
   return Array.isArray(rows) && rows[0] ? rows[0] : null;
 }
 
+// 把自己解锁的成就数告诉服务器（排行榜昵称旁显示）
+export async function setBadges(count) {
+  return rpc('set_badges', { p_token: playerToken(), p_count: count });
+}
+
 export const MESSAGES_PAGE = 30;
 
 // 给张楷留言：成功返回 'ok'；本机还没占过昵称返回 null

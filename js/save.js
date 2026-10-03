@@ -40,7 +40,10 @@ export function readSave() {
         wonThisGame: Boolean(st.wonThisGame),
         currentShiny: st.currentShiny === true,
         nextShiny: st.nextShiny === true,
-        shinySeen: isNum(st.shinySeen) && st.shinySeen >= 0 ? st.shinySeen : 0
+        shinySeen: isNum(st.shinySeen) && st.shinySeen >= 0 ? st.shinySeen : 0,
+        fusions: isNum(st.fusions) && st.fusions >= 0 ? st.fusions : 0,
+        dangerShift: isNum(st.dangerShift) && st.dangerShift >= 0 && st.dangerShift <= 200 ? st.dangerShift : 0,
+        round: st.round && typeof st.round === 'object' ? st.round : null
       }
     };
   } catch { return null; }

@@ -6,6 +6,7 @@ import { $ } from './dom.js';
 import { leaderboardEnabled, postMessage, listMessages, claimName, MESSAGES_PAGE } from './leaderboard.js';
 import { avatarEl } from './avatar.js';
 import { renderMeBar } from './profile.js';
+import { onMessage } from './achievements.js';
 
 const MAX_LEN = 200;
 let oldestId = null;
@@ -82,6 +83,7 @@ async function sendMessage() {
     $('book-input').value = '';
     updateCount();
     $('book-msg').textContent = '留言成功';
+    onMessage();
     oldestId = null;
     await loadMessages();
   } catch (err) {

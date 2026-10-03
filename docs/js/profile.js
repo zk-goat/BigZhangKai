@@ -1,8 +1,8 @@
 // 自己的头像：本机缓存一份，换头像时同时上传到服务器
-import { STORAGE_KEYS } from './config.js?v=cc9230d0';
-import { store } from './skin.js?v=4723788e';
-import { setAvatar, myProfile, claimName } from './leaderboard.js?v=c18f727f';
-import { avatarEl, makeAvatar } from './avatar.js?v=f69b1bf0';
+import { STORAGE_KEYS } from './config.js?v=21648a52';
+import { store } from './skin.js?v=83f93ead';
+import { setAvatar, myProfile, claimName, setBadges } from './leaderboard.js?v=feae38ca';
+import { avatarEl, makeAvatar } from './avatar.js?v=a2dafd4d';
 
 export const myAvatar = () => store.get(STORAGE_KEYS.avatar) || '';
 
@@ -54,4 +54,12 @@ export function renderMeBar(el, { size = 28, onChanged } = {}) {
     }
   });
   el.replaceChildren(avatarEl(name, myAvatar(), size), nm, pick, msg);
+}
+
+// 成就数同步到服务器：解锁后等一会儿再传（连着解锁几个只传一次），连不上就下次再说
+let badgeTimer = 0;
+export function syncBadges(count) {
+  if (!count || !store.get(STORAGE_KEYS.playerName)) return;
+  clearTimeout(badgeTimer);
+  badgeTimer = setTimeout(() => { setBadges(count).catch(() => { /* 下次再传 */ }); }, 1500);
 }

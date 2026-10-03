@@ -1,11 +1,12 @@
 // 给张楷的留言墙：所有人都能看，署名用游戏昵称。打开时游戏暂停。
-import { STORAGE_KEYS } from './config.js?v=cc9230d0';
-import { store } from './skin.js?v=4723788e';
-import { state } from './state.js?v=0eefd06e';
+import { STORAGE_KEYS } from './config.js?v=21648a52';
+import { store } from './skin.js?v=83f93ead';
+import { state } from './state.js?v=5f7e2107';
 import { $ } from './dom.js?v=5b57db68';
-import { leaderboardEnabled, postMessage, listMessages, claimName, MESSAGES_PAGE } from './leaderboard.js?v=c18f727f';
-import { avatarEl } from './avatar.js?v=f69b1bf0';
-import { renderMeBar } from './profile.js?v=bc3b2c02';
+import { leaderboardEnabled, postMessage, listMessages, claimName, MESSAGES_PAGE } from './leaderboard.js?v=feae38ca';
+import { avatarEl } from './avatar.js?v=a2dafd4d';
+import { renderMeBar } from './profile.js?v=f8ea613e';
+import { onMessage } from './achievements.js?v=6e59b0e1';
 
 const MAX_LEN = 200;
 let oldestId = null;
@@ -82,6 +83,7 @@ async function sendMessage() {
     $('book-input').value = '';
     updateCount();
     $('book-msg').textContent = '留言成功';
+    onMessage();
     oldestId = null;
     await loadMessages();
   } catch (err) {

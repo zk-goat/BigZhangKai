@@ -1,7 +1,7 @@
 // 一局进行中的存档：场上每个张楷 + 本局状态。退出再进来能接着玩。
 // 只存在本机；游戏结束或主动重开时清空。
-import { MAX, FIELD, STORAGE_KEYS } from './config.js?v=cc9230d0';
-import { store } from './skin.js?v=4723788e';
+import { MAX, FIELD, STORAGE_KEYS } from './config.js?v=21648a52';
+import { store } from './skin.js?v=83f93ead';
 
 const SAVE_VERSION = 1;
 const MAX_BODIES = 400;
@@ -40,7 +40,10 @@ export function readSave() {
         wonThisGame: Boolean(st.wonThisGame),
         currentShiny: st.currentShiny === true,
         nextShiny: st.nextShiny === true,
-        shinySeen: isNum(st.shinySeen) && st.shinySeen >= 0 ? st.shinySeen : 0
+        shinySeen: isNum(st.shinySeen) && st.shinySeen >= 0 ? st.shinySeen : 0,
+        fusions: isNum(st.fusions) && st.fusions >= 0 ? st.fusions : 0,
+        dangerShift: isNum(st.dangerShift) && st.dangerShift >= 0 && st.dangerShift <= 200 ? st.dangerShift : 0,
+        round: st.round && typeof st.round === 'object' ? st.round : null
       }
     };
   } catch { return null; }

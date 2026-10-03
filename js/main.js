@@ -10,7 +10,9 @@ import { bindRankboard, flushPending } from './rankboard.js';
 import { bindWelcome, showWelcomeIfNeeded, needsWelcome } from './welcome.js';
 import { bindNotice, showNoticeIfNew } from './notice.js';
 import { bindGuestbook } from './guestbook.js';
-import { syncMyAvatar } from './profile.js';
+import { syncMyAvatar, syncBadges } from './profile.js';
+import { bindAchievements } from './achieve-ui.js';
+import { onMute, unlockedCount } from './achievements.js';
 import { $ } from './dom.js';
 
 function renderSoundBtn() {
@@ -35,11 +37,12 @@ function bindButtons() {
   $('btn-again').addEventListener('click', startGame);
   $('btn-copy').addEventListener('click', copyShare);
   $('btn-continue').addEventListener('click', () => { $('win').hidden = true; state.paused = false; });
-  $('btn-sound').addEventListener('click', () => { toggleMuted(); renderSoundBtn(); });
+  $('btn-sound').addEventListener('click', () => { if (toggleMuted()) onMute(); renderSoundBtn(); });
   bindRankboard();
   bindWelcome();
   bindNotice();
   bindGuestbook();
+  bindAchievements({ onCountChanged: syncBadges });
   renderSoundBtn();
 }
 
@@ -86,6 +89,7 @@ async function boot() {
   runTestHooks();
   flushPending();
   syncMyAvatar();
+  syncBadges(unlockedCount());
   if (document.fonts) document.fonts.ready.then(fit);
 }
 

@@ -278,6 +278,38 @@ label.linkish { cursor: pointer; }
 .rank-tabs button { border: 0; border-radius: 0; padding: 6px 0; font-size: .9rem; background: var(--panel); color: var(--ink); }
 .rank-tabs button.on { background: var(--ink); color: var(--panel); }
 .rank-info { margin: 0; font-size: .8rem; color: var(--muted); text-align: center; min-height: 1.2em; white-space: pre-line; line-height: 1.6; }
+
+/* 成就 */
+.achv-toast {
+  position: fixed; left: 50%; top: calc(env(safe-area-inset-top, 0px) + 10px); z-index: 9;
+  transform: translate(-50%, -140%); transition: transform .3s ease;
+  display: flex; align-items: center; gap: 8px; white-space: nowrap;
+  background: linear-gradient(135deg, #3b2a14, #5a3d17); color: #fff6d6;
+  border: 2px solid #f2b705; border-radius: 999px; padding: 8px 18px 8px 12px;
+  box-shadow: 0 6px 18px rgba(59,42,20,.35); font-size: .9rem;
+}
+.achv-toast.show { transform: translate(-50%, 0); }
+.achv-toast b { color: #ffd54a; }
+.achv-toast-icon { font-size: 1.2rem; }
+@media (prefers-reduced-motion: reduce) { .achv-toast { transition: none; } }
+.achv-card { gap: 10px; }
+.achv-count { margin: 0; text-align: center; color: var(--muted); font-size: .85rem; }
+.achv-list { display: grid; gap: 14px; }
+.achv-list h3 { margin: 0 0 6px; font-size: .85rem; color: var(--muted); letter-spacing: .1em; }
+.achv-list ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.achv-list li { display: grid; grid-template-columns: 32px 1fr; gap: 10px; align-items: center; padding: 8px 10px; border-radius: 12px; background: rgba(59,42,20,.06); }
+.achv-list li.got { background: linear-gradient(135deg, rgba(255,213,74,.35), rgba(255,236,170,.25)); outline: 1.5px solid rgba(242,183,5,.6); }
+.achv-icon { font-size: 1.4rem; text-align: center; filter: grayscale(1); opacity: .5; }
+.achv-list li.got .achv-icon { filter: none; opacity: 1; }
+.achv-text { display: grid; gap: 2px; min-width: 0; }
+.achv-text b { font-size: .95rem; color: var(--ink); }
+.achv-list li:not(.got) .achv-text b { color: var(--muted); }
+.achv-text small { font-size: .75rem; color: var(--muted); }
+.achv-bar { display: block; height: 5px; border-radius: 999px; background: rgba(59,42,20,.12); overflow: hidden; margin-top: 3px; }
+.achv-bar i { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.achv-num { font-variant-numeric: tabular-nums; }
+.report-achv { margin: 0; font-size: .85rem !important; color: #8a5a00 !important; font-weight: 700; text-align: center; }
+.badge-count { margin-left: 6px; font-size: .72rem; font-weight: 400; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -289,6 +321,7 @@ label.linkish { cursor: pointer; }
     <button id="btn-rank" type="button" hidden>排行</button>
     <button id="btn-notice" type="button">公告</button>
     <button id="btn-book" type="button" hidden>留言</button>
+    <button id="btn-achv" type="button">成就</button>
   </div>
   <div class="score"><span id="score">0</span><small>最高 <span id="best">0</span></small></div>
 </div>
@@ -322,6 +355,20 @@ label.linkish { cursor: pointer; }
     <input id="welcome-name" type="text" maxlength="12" placeholder="你的昵称（最多 12 个字）" autocomplete="nickname">
     <button id="btn-welcome" type="button">开始玩</button>
     <p class="welcome-msg" id="welcome-msg" role="status"></p>
+  </div>
+</div>
+
+<div class="achv-toast" id="achv-toast" role="status" hidden>
+  <span class="achv-toast-icon">🏆</span>
+  <span>解锁成就：<b id="achv-toast-name"></b></span>
+</div>
+
+<div class="overlay" id="achv-page" hidden>
+  <div class="card achv-card">
+    <h2>成就</h2>
+    <p class="achv-count" id="achv-count"></p>
+    <div class="achv-list" id="achv-list"></div>
+    <div class="actions"><button id="achv-close" type="button">关闭</button></div>
   </div>
 </div>
 
@@ -391,6 +438,7 @@ label.linkish { cursor: pointer; }
         <div><b id="stat-combo">0</b><span>最大连击</span></div>
         <div><b id="stat-time">0:00</b><span>用时</span></div>
       </div>
+      <p class="report-achv" id="report-achv" hidden></p>
       <div class="dex" id="dex">
         <p class="dex-line" id="dex-line"></p>
         <div class="dex-dots" id="dex-dots"></div>
@@ -488,6 +536,9 @@ const RULES = {
   dangerHoldMs: 2000,      // 越线持续多久判负
   comboWindowMs: 1200,
   winBonus: 200,
+  fuseBonus: 1000,         // 两个大张楷合体的奖励分
+  fuseDangerStep: 15,      // 每合体一次，危险线下移多少（越来越难，防止无限刷）
+  fuseDangerMax: 90,       // 危险线最多下移多少
   scoreScale: 1.75,        // 每次合成得分倍率：后期掉大张楷后合成次数变少，按此补回，让新老成绩可比
   tallCap: 2.4             // 细长照片最长边不超过 半径 × 这个倍数
 };
@@ -538,7 +589,9 @@ const STORAGE_KEYS = {
   noticeSeen: 'dazhangkai-notice-seen',
   dex: 'dazhangkai-shiny-dex',
   avatar: 'dazhangkai-avatar',
-  weekBest: 'dazhangkai-week-best'
+  weekBest: 'dazhangkai-week-best',
+  achievements: 'dazhangkai-achievements',
+  gamesPlayed: 'dazhangkai-games-played'
 };
 
 const SHARE_URL = 'zk-goat.github.io/BigZhangKai';
@@ -770,6 +823,8 @@ const state = {
   currentShiny: false,
   nextShiny: false,
   shinySeen: 0,
+  fusions: 0,       // 本局大张楷合体次数
+  dangerShift: 0,   // 危险线因合体下移了多少
   aimX: FIELD.width / 2,
   canDrop: true,
   over: false,
@@ -788,7 +843,7 @@ const state = {
 function resetRound(engine, firstNext) {
   Object.assign(state, {
     engine,
-    score: 0, topLevel: 0, current: 0, next: firstNext, currentShiny: false, nextShiny: false, shinySeen: 0,
+    score: 0, topLevel: 0, current: 0, next: firstNext, currentShiny: false, nextShiny: false, shinySeen: 0, fusions: 0, dangerShift: 0,
     aimX: FIELD.width / 2, canDrop: true, over: false, paused: false, wonThisGame: false,
     dangerSince: 0, mergeCount: 0, maxCombo: 0, startedAt: Date.now(), combo: 0, lastMergeAt: 0
   });
@@ -1144,6 +1199,11 @@ async function myProfile() {
   return Array.isArray(rows) && rows[0] ? rows[0] : null;
 }
 
+// 把自己解锁的成就数告诉服务器（排行榜昵称旁显示）
+async function setBadges(count) {
+  return rpc('set_badges', { p_token: playerToken(), p_count: count });
+}
+
 const MESSAGES_PAGE = 30;
 
 // 给张楷留言：成功返回 'ok'；本机还没占过昵称返回 null
@@ -1192,6 +1252,152 @@ function weekKey(now = Date.now()) {
 function daysLeft(now = Date.now()) {
   return Math.max(1, Math.ceil((weekStart(now) + 7 * DAY_MS - now) / DAY_MS));
 }
+
+// ---- dex.js ----
+// 闪光图鉴：本机见过哪些等级的闪光张楷。只存在本机。
+
+
+function loadDex() {
+  try {
+    const d = JSON.parse(store.get(STORAGE_KEYS.dex) || '[]');
+    return Array.isArray(d) ? [...new Set(d.filter(x => Number.isInteger(x) && x >= 0 && x <= MAX))] : [];
+  } catch { return []; }
+}
+
+// 记一笔；返回是不是第一次见到这一级的闪光
+function recordShiny(lv) {
+  const dex = loadDex();
+  if (dex.includes(lv)) return false;
+  store.set(STORAGE_KEYS.dex, JSON.stringify([...dex, lv]));
+  return true;
+}
+
+// ---- achievements.js ----
+// 成就：定义、触发判断、本机存储。界面在 achieve-ui.js。
+// 游戏各处在发生事件时调用下面的 onXxx，满足条件就解锁；解锁结果存在本机。
+
+
+
+const lvOf = name => LEVELS.findIndex(l => l.name === name);
+const QUESHEN = lvOf('雀神楷'), ZHONGZHI = lvOf('中指楷'), WAJUEJI = lvOf('挖掘机楷');
+
+const SCORE_TIERS = { 'score-1': 15000, 'score-2': 25000, 'score-3': 40000 };
+const GAME_TIERS = { 'games-1': 4, 'games-2': 16, 'games-3': 64 };
+
+// hidden：解锁前只显示 ？？？；goal + progress：成就页显示进度条
+const ACHIEVEMENTS = [
+  { id: 'first-max', group: '主线', name: '楷旋而归', desc: '合出第一个大张楷' },
+  { id: 'fuse', group: '主线', name: '张楷，合体！', desc: '两个大张楷合体一次' },
+  { id: 'fuse-3', group: '主线', name: '楷天辟地', desc: '一局里合体 3 次' },
+  { id: 'score-1', group: '分数', name: '楷始发力', desc: '单局 1.5 万分' },
+  { id: 'score-2', group: '分数', name: '势不可楷', desc: '单局 2.5 万分' },
+  { id: 'score-3', group: '分数', name: '楷神降临', desc: '单局 4 万分' },
+  { id: 'combo-5', group: '技巧', name: '连环楷', desc: '一局打出连击 ×5' },
+  { id: 'flash', group: '技巧', name: '闪电楷', desc: '5 分钟内合出大张楷' },
+  { id: 'gold-5', group: '黄金', name: '金光闪闪', desc: '一局遇到 5 个黄金张楷' },
+  { id: 'gold-max', group: '黄金', name: '点石成金', desc: '合出黄金大张楷' },
+  { id: 'gold-dex', group: '黄金', name: '张楷金库', desc: '黄金图鉴集齐 14 级', goal: LEVELS.length, progress: () => loadDex().length },
+  { id: 'thirteen', group: '玩梗', name: '十三幺', desc: '一局里合出 13 个雀神楷' },
+  { id: 'finger-3', group: '玩梗', name: '中指连发', desc: '场上同时有 3 个中指楷' },
+  { id: 'digger', group: '玩梗', name: '挖掘机哪家强', desc: '一局里合出 3 个挖掘机楷' },
+  { id: 'instant', group: '惊喜', name: '秒了', desc: '开局 30 秒内就输了', hidden: true },
+  { id: 'mute', group: '惊喜', name: '张楷别吵', desc: '把游戏静音', hidden: true },
+  { id: 'night', group: '惊喜', name: '深夜楷', desc: '凌晨 0～5 点打完一局', hidden: true },
+  { id: 'games-1', group: '坚持', name: '初识张楷', desc: '累计玩 4 局', goal: 4, progress: () => gamesPlayed() },
+  { id: 'games-2', group: '坚持', name: '张楷常客', desc: '累计玩 16 局', goal: 16, progress: () => gamesPlayed() },
+  { id: 'games-3', group: '坚持', name: '张楷铁粉', desc: '累计玩 64 局', goal: 64, progress: () => gamesPlayed() },
+  { id: 'message', group: '社交', name: '有话对楷说', desc: '第一次给张楷留言' },
+  { id: 'week-star', group: '社交', name: '本周之星', desc: '进本周榜前三' }
+];
+const GROUPS = ['主线', '分数', '技巧', '黄金', '玩梗', '惊喜', '坚持', '社交'];
+
+// ---------- 本机存储 ----------
+function loadUnlocked() {
+  try {
+    const u = JSON.parse(store.get(STORAGE_KEYS.achievements) || '{}');
+    return u && typeof u === 'object' ? u : {};
+  } catch { return {}; }
+}
+let unlocked = loadUnlocked();
+const isUnlocked = id => Boolean(unlocked[id]);
+const unlockedCount = () => ACHIEVEMENTS.filter(a => unlocked[a.id]).length;
+function gamesPlayed() { return Number(store.get(STORAGE_KEYS.gamesPlayed)) || 0; }
+
+const listeners = [];
+const onUnlock = fn => listeners.push(fn);
+
+let roundUnlocks = [];
+const takeRoundUnlocks = () => { const r = roundUnlocks; roundUnlocks = []; return r; };
+
+function unlock(id) {
+  if (unlocked[id]) return;
+  const def = ACHIEVEMENTS.find(a => a.id === id);
+  if (!def) return;
+  unlocked = { ...unlocked, [id]: Date.now() };
+  store.set(STORAGE_KEYS.achievements, JSON.stringify(unlocked));
+  roundUnlocks = [...roundUnlocks, def];
+  listeners.forEach(fn => fn(def));
+}
+
+// ---------- 一局内的计数（存档时一起保存） ----------
+const freshRound = () => ({ made: new Array(MAX + 1).fill(0), shiny: 0 });
+let round = freshRound();
+const roundStats = () => ({ made: [...round.made], shiny: round.shiny });
+function resetRoundStats(saved) {
+  const ok = saved && Array.isArray(saved.made) && saved.made.length === MAX + 1 && saved.made.every(Number.isFinite);
+  round = ok ? { made: [...saved.made], shiny: Number(saved.shiny) || 0 } : freshRound();
+  roundUnlocks = [];
+}
+
+function checkScore(score) {
+  Object.entries(SCORE_TIERS).forEach(([id, need]) => { if (score >= need) unlock(id); });
+}
+
+// ---------- 事件 ----------
+function onMerge({ lv, combo, score, shiny, playedMs }) {
+  round.made[lv] += 1;
+  if (lv === MAX) {
+    unlock('first-max');
+    if (playedMs < 5 * 60 * 1000) unlock('flash');
+    if (shiny) unlock('gold-max');
+  }
+  if (combo >= 5) unlock('combo-5');
+  if (round.made[QUESHEN] >= 13) unlock('thirteen');
+  if (round.made[WAJUEJI] >= 3) unlock('digger');
+  checkScore(score);
+}
+
+// fresh：新出现的（不是遗传延续的）
+function onShiny({ lv, fresh }) {
+  if (fresh) round.shiny += 1;
+  if (round.shiny >= 5) unlock('gold-5');
+  if (lv === MAX) unlock('gold-max');
+  if (loadDex().length >= LEVELS.length) unlock('gold-dex');
+}
+
+function onFuse({ fusions, score }) {
+  unlock('fuse');
+  if (fusions >= 3) unlock('fuse-3');
+  checkScore(score);
+}
+
+// 场上各级张楷的数量（每次投放和合成后调用）
+function onBoard(counts) {
+  if (counts[ZHONGZHI] >= 3) unlock('finger-3');
+}
+
+function onRoundEnd({ score, playedMs, now = new Date() }) {
+  const games = gamesPlayed() + 1;
+  store.set(STORAGE_KEYS.gamesPlayed, String(games));
+  Object.entries(GAME_TIERS).forEach(([id, need]) => { if (games >= need) unlock(id); });
+  checkScore(score);
+  if (playedMs < 30 * 1000) unlock('instant');
+  if (now.getHours() < 5) unlock('night');
+}
+
+const onMute = () => unlock('mute');
+const onMessage = () => unlock('message');
+function onWeekRank(rank) { if (rank && rank <= 3) unlock('week-star'); }
 
 // ---- avatar.js ----
 // 个人头像：选好的照片在手机上裁成正方形、压成 96×96 小图；没有头像时显示昵称首字的彩色圆。
@@ -1312,9 +1518,18 @@ function renderMeBar(el, { size = 28, onChanged } = {}) {
   el.replaceChildren(avatarEl(name, myAvatar(), size), nm, pick, msg);
 }
 
+// 成就数同步到服务器：解锁后等一会儿再传（连着解锁几个只传一次），连不上就下次再说
+let badgeTimer = 0;
+function syncBadges(count) {
+  if (!count || !store.get(STORAGE_KEYS.playerName)) return;
+  clearTimeout(badgeTimer);
+  badgeTimer = setTimeout(() => { setBadges(count).catch(() => { /* 下次再传 */ }); }, 1500);
+}
+
 // ---- rankboard.js ----
 // 排行榜界面：顶栏“排行榜”弹窗 + 战报卡上的自动上榜。
 // 第一次结束时占一个昵称（全班唯一），以后每局结束自动上传；破了自己本周最好成绩才传（历史最高自然也在里面）。
+
 
 
 
@@ -1379,6 +1594,11 @@ function renderList(rows) {
     const face = avatarEl(r.name, r.avatar, 32);
     const who = document.createElement('span'); who.className = 'who';
     const nm = document.createElement('b'); nm.textContent = r.name;
+    if (r.badges > 0) {
+      const badge = document.createElement('span'); badge.className = 'badge-count'; badge.textContent = '🏆' + r.badges;
+      badge.title = `解锁了 ${r.badges} 个成就`;
+      nm.append(badge);
+    }
     const lv = document.createElement('small');
     lv.textContent = (skin[r.top_level] ? skin[r.top_level].name : '') + ' · '
       + new Date(r.created_at).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
@@ -1511,6 +1731,7 @@ async function autoUpload(reclaimed = false) {
       return;
     }
     const wr = await myWeekRank().catch(() => null);
+    onWeekRank(wr);
     const ranks = (wr ? `本周第 ${wr} 名，` : '') + `总榜第 ${rank} 名`;
     setMsg(toSend !== run ? `已补传之前的 ${toSend.score} 分：${ranks}`
       : isRecord ? `新纪录！${ranks}` : `已上榜：${ranks}`);
@@ -1632,33 +1853,110 @@ function readSave() {
         wonThisGame: Boolean(st.wonThisGame),
         currentShiny: st.currentShiny === true,
         nextShiny: st.nextShiny === true,
-        shinySeen: isNum(st.shinySeen) && st.shinySeen >= 0 ? st.shinySeen : 0
+        shinySeen: isNum(st.shinySeen) && st.shinySeen >= 0 ? st.shinySeen : 0,
+        fusions: isNum(st.fusions) && st.fusions >= 0 ? st.fusions : 0,
+        dangerShift: isNum(st.dangerShift) && st.dangerShift >= 0 && st.dangerShift <= 200 ? st.dangerShift : 0,
+        round: st.round && typeof st.round === 'object' ? st.round : null
       }
     };
   } catch { return null; }
 }
 
-// ---- dex.js ----
-// 闪光图鉴：本机见过哪些等级的闪光张楷。只存在本机。
+// ---- achieve-ui.js ----
+// 成就界面：顶部“成就”页面、解锁时从上方滑出的提示。
 
 
-function loadDex() {
-  try {
-    const d = JSON.parse(store.get(STORAGE_KEYS.dex) || '[]');
-    return Array.isArray(d) ? [...new Set(d.filter(x => Number.isInteger(x) && x >= 0 && x <= MAX))] : [];
-  } catch { return []; }
+
+const ACHV_TOAST_MS = 2600;
+let achvQueue = [];
+let achvShowing = false;
+let pausedByAchv = false;
+
+// ---------- 解锁提示：一个接一个从上方滑出 ----------
+function nextAchvToast() {
+  if (achvShowing || !achvQueue.length) return;
+  const [def, ...rest] = achvQueue;
+  achvQueue = rest;
+  achvShowing = true;
+  const el = $('achv-toast');
+  $('achv-toast-name').textContent = def.name;
+  el.hidden = false;
+  el.classList.remove('show');
+  void el.offsetWidth;  // 重新触发动画
+  el.classList.add('show');
+  setTimeout(() => {
+    el.classList.remove('show');
+    setTimeout(() => { el.hidden = true; achvShowing = false; nextAchvToast(); }, 300);
+  }, ACHV_TOAST_MS);
 }
 
-// 记一笔；返回是不是第一次见到这一级的闪光
-function recordShiny(lv) {
-  const dex = loadDex();
-  if (dex.includes(lv)) return false;
-  store.set(STORAGE_KEYS.dex, JSON.stringify([...dex, lv]));
-  return true;
+// ---------- 成就页面 ----------
+function achvItemEl(a) {
+  const got = isUnlocked(a.id);
+  const li = document.createElement('li');
+  li.className = got ? 'got' : '';
+  const icon = document.createElement('span'); icon.className = 'achv-icon'; icon.textContent = got ? '🏆' : '🔒';
+  const text = document.createElement('div'); text.className = 'achv-text';
+  const name = document.createElement('b'); name.textContent = got || !a.hidden ? a.name : '？？？';
+  const desc = document.createElement('small'); desc.textContent = got || !a.hidden ? a.desc : '隐藏成就，玩着玩着就解锁了';
+  text.append(name, desc);
+  if (a.goal && !got) {
+    const n = Math.min(a.goal, a.progress());
+    const bar = document.createElement('span'); bar.className = 'achv-bar';
+    const fill = document.createElement('i'); fill.style.width = `${(n / a.goal) * 100}%`;
+    bar.append(fill);
+    const num = document.createElement('small'); num.className = 'achv-num'; num.textContent = `${n}/${a.goal}`;
+    text.append(bar, num);
+  }
+  li.append(icon, text);
+  return li;
+}
+
+function renderAchvPage() {
+  $('achv-count').textContent = `已解锁 ${unlockedCount()}/${ACHIEVEMENTS.length}`;
+  $('achv-list').replaceChildren(...GROUPS.map(g => {
+    const sec = document.createElement('section');
+    const h = document.createElement('h3'); h.textContent = g;
+    const ul = document.createElement('ul');
+    ul.append(...ACHIEVEMENTS.filter(a => a.group === g).map(achvItemEl));
+    sec.append(h, ul);
+    return sec;
+  }));
+}
+
+function openAchvPage() {
+  pausedByAchv = !state.over && !state.paused;
+  if (pausedByAchv) state.paused = true;
+  renderAchvPage();
+  $('achv-page').hidden = false;
+}
+
+function closeAchvPage() {
+  $('achv-page').hidden = true;
+  if (pausedByAchv) state.paused = false;
+  pausedByAchv = false;
+}
+
+// 战报卡上的“本局解锁”
+function showRoundUnlocks(defs) {
+  $('report-achv').hidden = !defs.length;
+  $('report-achv').textContent = defs.length ? `本局解锁成就：${defs.map(d => d.name).join('、')}` : '';
+}
+
+function bindAchievements({ onCountChanged } = {}) {
+  onUnlock(def => {
+    achvQueue = [...achvQueue, def];
+    nextAchvToast();
+    if (onCountChanged) onCountChanged(unlockedCount());
+  });
+  $('btn-achv').addEventListener('click', openAchvPage);
+  $('achv-close').addEventListener('click', closeAchvPage);
 }
 
 // ---- report.js ----
 // 结算：战报卡、本机前 5、复制战绩，以及合出大张楷时的庆祝画面。
+
+
 
 
 
@@ -1749,6 +2047,7 @@ function gameOver() {
   const { score, topLevel, mergeCount, maxCombo, startedAt, wonThisGame } = state;
   state.over = true;
   clearSave();
+  onRoundEnd({ score, playedMs: Date.now() - startedAt });
   sfx.over();
 
   const run = { score, lv: topLevel, at: Date.now() };
@@ -1760,7 +2059,7 @@ function gameOver() {
 
   $('report-date').textContent = new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
   $('report-stamp').hidden = !isRecord;
-  $('report-verdict').textContent = wonThisGame ? '合出过大张楷！' : verdictFor(topLevel);
+  $('report-verdict').textContent = state.fusions > 0 ? `张楷合体 ×${state.fusions}！` : wonThisGame ? '合出过大张楷！' : verdictFor(topLevel);
   $('report-hero').style.setProperty('--lv', LEVELS[topLevel].color);
   paintLevel($('final-pic'), topLevel);
   $('final-title').textContent = title;
@@ -1775,10 +2074,12 @@ function gameOver() {
   $('report-foot').textContent = '截图发群里 · ' + SHARE_URL;
   renderBoard(board, run);
   renderDex(state.shinySeen);
+  showRoundUnlocks(takeRoundUnlocks());
   onRoundOver();
 
   shareText = `我在「合成大张楷」拿了 ${score} 分，最高合成到第 ${topLevel + 1} 级「${name}」，称号：${title}`
     + (isRecord ? '，刷新了我的最高纪录' : '')
+    + (state.fusions > 0 ? `，张楷合体 ${state.fusions} 次` : '')
     + (state.shinySeen > 0 ? `，还遇到了 ${state.shinySeen} 个黄金张楷` : '')
     + (wonThisGame ? '。我已经合出大张楷了，你呢？' : '。你能合出大张楷吗？')
     + ' ' + SHARE_URL;
@@ -1844,14 +2145,14 @@ const MAX_PARTICLES = 260;
 
 let rings = [], particles = [], floats = [];
 let shakeUntil = 0, shakeAmp = 0, comboText = '', comboUntil = 0;
-let flashUntil = 0, bannerAt = -Infinity;
 const FLASH_MS = 300, BANNER_MS = 1300;
+let flashUntil = 0, bannerAt = -Infinity, bannerText = '', bannerSize = 32, flashAlpha = 0.22, bannerMs = BANNER_MS;
 const GOLDS = ['#ffd54a', '#ffe9a0', '#f2b705', '#fff6d6', '#e8a400'];
 const SPARKLE_COLORS = ['#ffffff', '#fff3b0', '#ffd54a', '#ffffff', '#ffe0f0', '#d8f4ff'];
 
 function resetEffects() {
   rings = []; particles = []; floats = [];
-  shakeUntil = 0; comboUntil = 0; flashUntil = 0; bannerAt = -Infinity;
+  shakeUntil = 0; comboUntil = 0; flashUntil = 0; bannerAt = -Infinity; bannerText = '';
 }
 
 function mergeEffects({ x, y, lv, gain, combo, now, shiny = false }) {
@@ -1881,6 +2182,7 @@ function shinyEffects({ x, y, now, quiet = false }) {
   if (!quiet) {  // 遗传延续的黄金张楷不再弹大字、不闪屏
     flashUntil = now + FLASH_MS;
     bannerAt = now;
+    bannerText = '黄金张楷！'; bannerSize = 32; flashAlpha = 0.22; bannerMs = BANNER_MS;
   }
   const n = quiet ? 8 : 14;
   const fresh = Array.from({ length: n }, (_, i) => {
@@ -1893,28 +2195,48 @@ function shinyEffects({ x, y, now, quiet = false }) {
   particles = [...particles, ...fresh].slice(-MAX_PARTICLES);
 }
 
+// 两个大张楷合体：更大的字、更亮的闪光、彩色加金色的大爆发、震屏
+function fuseEffects({ x, y, now }) {
+  flashUntil = now + FLASH_MS * 2;
+  bannerAt = now;
+  bannerText = '张楷，合体！'; bannerSize = 40; flashAlpha = 0.45; bannerMs = 2000;  // 难得的大场面，字幕多停一会儿
+  shakeUntil = now + 500; shakeAmp = 9;
+  const n = 48;
+  const fresh = Array.from({ length: n }, (_, i) => {
+    const ang = (Math.PI * 2 * i) / n + Math.random() * 0.2, sp = 3 + Math.random() * 6;
+    return { x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp - 2, life: 1, star: i % 3 === 0,
+      size: i % 3 === 0 ? 7 + Math.random() * 6 : 3 + Math.random() * 4,
+      color: i % 2 ? GOLDS[i % GOLDS.length] : LEVELS[i % LEVELS.length].color, spin: Math.random() * 6 };
+  });
+  particles = [...particles, ...fresh].slice(-MAX_PARTICLES);
+}
+
 function drawShinyBanner(ctx, now) {
   const age = now - bannerAt;
-  if (age < 0 || age > BANNER_MS) return;
-  const inP = Math.min(1, age / 220), outP = Math.max(0, (age - (BANNER_MS - 350)) / 350);
+  if (age < 0 || age > bannerMs) return;
+  const inP = Math.min(1, age / 220), outP = Math.max(0, (age - (bannerMs - 350)) / 350);
   const scale = 0.7 + 0.3 * (1 - Math.pow(1 - inP, 3));
   ctx.save();
   ctx.globalAlpha = 1 - outP;
   ctx.translate(FIELD.width / 2, FIELD.height * 0.3 - 10 * inP);
   ctx.scale(scale, scale);
-  ctx.font = '32px "ZCOOL KuaiLe", sans-serif';
+  ctx.font = `${bannerSize}px "ZCOOL KuaiLe", sans-serif`;
   ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
   const g = ctx.createLinearGradient(0, -16, 0, 16);
   g.addColorStop(0, '#fffdf0'); g.addColorStop(0.4, '#ffe14d'); g.addColorStop(0.75, '#ffb000'); g.addColorStop(1, '#ff8a00');
   ctx.shadowColor = 'rgba(255,255,255,.9)'; ctx.shadowBlur = 14;   // 外圈白色辉光
   ctx.lineWidth = 6; ctx.strokeStyle = '#5a2e00';
-  ctx.strokeText('黄金张楷！', 0, 0);
+  ctx.strokeText(bannerText, 0, 0);
   ctx.shadowBlur = 0;
   ctx.fillStyle = g;
-  ctx.fillText('黄金张楷！', 0, 0);
+  ctx.fillText(bannerText, 0, 0);
   ctx.lineWidth = 1.2; ctx.strokeStyle = 'rgba(255,255,255,.8)';    // 字面一圈细亮边
-  ctx.strokeText('黄金张楷！', 0, -1);
+  ctx.strokeText(bannerText, 0, -1);
   ctx.restore();
+}
+
+function floatScore(x, y, gain) {
+  floats = [...floats, { x, y, text: '+' + gain, t: 0 }];
 }
 
 // 在画面最开始调用：震屏偏移
@@ -1976,7 +2298,7 @@ function drawEffects(ctx, now) {
     }
   });
   if (now < flashUntil) {
-    ctx.fillStyle = `rgba(255,248,215,${0.22 * (flashUntil - now) / FLASH_MS})`;
+    ctx.fillStyle = `rgba(255,248,215,${flashAlpha * Math.min(1, (flashUntil - now) / FLASH_MS)})`;
     ctx.fillRect(-20, -20, FIELD.width + 40, FIELD.height + 40);
   }
   drawShinyBanner(ctx, now);
@@ -1985,6 +2307,7 @@ function drawEffects(ctx, now) {
 
 // ---- game.js ----
 // 游戏本体：物理世界、投放、合成、判负、主循环、画面适配和输入。
+
 
 
 
@@ -2047,6 +2370,7 @@ function makeKai(x, y, lv, shiny = false) {
 function announceShiny(b, inherited = false) {
   if (silent) return;
   recordShiny(b.kaiLevel);
+  onShiny({ lv: b.kaiLevel, fresh: !inherited });
   shinyEffects({ x: b.position.x, y: b.position.y, now: clock(), quiet: inherited });
   if (inherited) return;
   state.shinySeen += 1;
@@ -2056,13 +2380,13 @@ function announceShiny(b, inherited = false) {
 // ---------- 合成 ----------
 function onCollide(ev) {
   ev.pairs.forEach(({ bodyA: a, bodyB: b }) => {
-    if (isKai(a) && isKai(b) && !a.merged && !b.merged && a.kaiLevel === b.kaiLevel && a.kaiLevel < MAX) mergePair(a, b);
+    if (isKai(a) && isKai(b) && !a.merged && !b.merged && a.kaiLevel === b.kaiLevel) mergePair(a, b);
   });
 }
 
 // 照片轮廓不规则，光靠碰撞常差一条缝：同级重心够近也算碰到
 function mergeNearby() {
-  const bodies = kaiBodies().filter(b => !b.merged && b.kaiLevel < MAX);
+  const bodies = kaiBodies().filter(b => !b.merged);
   for (let i = 0; i < bodies.length; i++) {
     for (let j = i + 1; j < bodies.length; j++) {
       const a = bodies[i], b = bodies[j];
@@ -2074,7 +2398,28 @@ function mergeNearby() {
   }
 }
 
+// 危险线：每次大张楷合体后往下移一点，可用空间越来越小
+const dangerY = () => FIELD.dangerY + state.dangerShift;
+
+// 两个大张楷合体：一起消失，奖励分数，危险线下移
+function fuseMax(a, b) {
+  a.merged = b.merged = true;
+  const x = (a.position.x + b.position.x) / 2, y = (a.position.y + b.position.y) / 2;
+  Composite.remove(state.engine.world, [a, b]);
+  state.fusions += 1;
+  state.mergeCount += 1;
+  state.dangerShift = Math.min(RULES.fuseDangerMax, state.dangerShift + RULES.fuseDangerStep);
+  addScore(RULES.fuseBonus);
+  if (silent) return;
+  fuseEffects({ x, y, now: clock() });
+  floatScore(x, y, RULES.fuseBonus);
+  sfx.win();
+  onFuse({ fusions: state.fusions, score: state.score });
+  updateHud();
+}
+
 function mergePair(a, b) {
+  if (a.kaiLevel === MAX) { fuseMax(a, b); return; }
   const lv = a.kaiLevel + 1, now = clock();
   a.merged = b.merged = true;
   const x = (a.position.x + b.position.x) / 2, y = (a.position.y + b.position.y) / 2;
@@ -2098,6 +2443,8 @@ function mergePair(a, b) {
   }
   mergeEffects({ x, y, lv, gain, combo: state.combo, now, shiny: parentShiny || nb.kaiShiny });
   if (nb.kaiShiny) announceShiny(nb, parentShiny);
+  onMerge({ lv, combo: state.combo, score: state.score, shiny: nb.kaiShiny, playedMs: Date.now() - state.startedAt });
+  onBoard(levelCounts());
   if (lv === MAX && !state.wonThisGame) showWin();
   else sfx.merge(lv, state.combo);
   updateHud();
@@ -2125,6 +2472,7 @@ function drop() {
   const dropped = makeKai(clampAim(state.current), FIELD.dropY, state.current, state.currentShiny);
   sfx.drop();
   if (dropped.kaiShiny) announceShiny(dropped);
+  onBoard(levelCounts());
   state.current = state.next;
   state.currentShiny = state.nextShiny;
   state.next = randLevel();
@@ -2136,7 +2484,7 @@ function drop() {
 
 function checkDanger(now) {
   const risky = kaiBodies().some(b =>
-    now - b.bornAt > RULES.dangerGraceMs && b.bounds.min.y < FIELD.dangerY && Math.abs(b.velocity.y) < 1.2);
+    now - b.bornAt > RULES.dangerGraceMs && b.bounds.min.y < dangerY() && Math.abs(b.velocity.y) < 1.2);
   if (!risky) { state.dangerSince = 0; return; }
   if (!state.dangerSince) state.dangerSince = now;
   if (now - state.dangerSince > RULES.dangerHoldMs) gameOver();
@@ -2221,6 +2569,7 @@ function startGame() {
   state.next = randLevel();
   state.currentShiny = rollShiny();
   state.nextShiny = rollShiny();
+  resetRoundStats();
   clearSave();
   updateHud();
 }
@@ -2239,6 +2588,7 @@ function snapshotGame() {
       score: state.score, topLevel: state.topLevel, current: state.current, next: state.next,
       mergeCount: state.mergeCount, maxCombo: state.maxCombo, wonThisGame: state.wonThisGame,
       currentShiny: state.currentShiny, nextShiny: state.nextShiny, shinySeen: state.shinySeen,
+      fusions: state.fusions, dangerShift: state.dangerShift, round: roundStats(),
       playedMs: Date.now() - state.startedAt
     }
   };
@@ -2253,7 +2603,8 @@ function saveNow() {
 // 按存档摆回每个张楷；刚恢复的张楷重新享受越线缓冲，不会一打开就判负
 function restoreGame(save) {
   enterRound(newEngine());
-  const { playedMs, wonThisGame, ...rest } = save.state;
+  const { playedMs, wonThisGame, round, ...rest } = save.state;
+  resetRoundStats(round);
   Object.assign(state, rest, { wonThisGame, startedAt: Date.now() - playedMs });
   save.bodies.forEach(({ lv, x, y, angle, shiny }) => Body.setAngle(makeKai(x, y, lv, shiny), angle));
   updateHud();
@@ -2272,7 +2623,7 @@ function draw(now) {
     ? (Math.sin(now / 80) > 0 ? COLORS.accent : 'rgba(226,73,47,.3)')
     : 'rgba(59,42,20,.25)';
   ctx.setLineDash([8, 6]); ctx.strokeStyle = warn; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(0, FIELD.dangerY); ctx.lineTo(W, FIELD.dangerY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0, dangerY()); ctx.lineTo(W, dangerY()); ctx.stroke();
   ctx.setLineDash([]);
 
   if (!state.over) {
@@ -2455,6 +2806,15 @@ function bindWelcome() {
 // 写法：每条一句话、只说有什么新东西，不解释原理。
 const ANNOUNCEMENTS = [
   {
+    id: '2026-10-03-achv',
+    date: '10 月 3 日',
+    title: '成就和张楷合体',
+    items: [
+      '顶部“成就”：22 个成就等你解锁',
+      '两个大张楷碰到会合体，奖励 1000 分'
+    ]
+  },
+  {
     id: '2026-10-03-gold-up',
     date: '10 月 3 日',
     title: '黄金张楷更常见了',
@@ -2572,6 +2932,7 @@ function bindNotice() {
 
 
 
+
 const MAX_LEN = 200;
 let oldestId = null;
 let loading = false;
@@ -2647,6 +3008,7 @@ async function sendMessage() {
     $('book-input').value = '';
     updateCount();
     $('book-msg').textContent = '留言成功';
+    onMessage();
     oldestId = null;
     await loadMessages();
   } catch (err) {
@@ -2698,6 +3060,8 @@ function bindGuestbook() {
 
 
 
+
+
 function renderSoundBtn() {
   const muted = isMuted();
   $('btn-sound').textContent = muted ? '开声' : '静音';
@@ -2720,11 +3084,12 @@ function bindButtons() {
   $('btn-again').addEventListener('click', startGame);
   $('btn-copy').addEventListener('click', copyShare);
   $('btn-continue').addEventListener('click', () => { $('win').hidden = true; state.paused = false; });
-  $('btn-sound').addEventListener('click', () => { toggleMuted(); renderSoundBtn(); });
+  $('btn-sound').addEventListener('click', () => { if (toggleMuted()) onMute(); renderSoundBtn(); });
   bindRankboard();
   bindWelcome();
   bindNotice();
   bindGuestbook();
+  bindAchievements({ onCountChanged: syncBadges });
   renderSoundBtn();
 }
 
@@ -2771,6 +3136,7 @@ async function boot() {
   runTestHooks();
   flushPending();
   syncMyAvatar();
+  syncBadges(unlockedCount());
   if (document.fonts) document.fonts.ready.then(fit);
 }
 

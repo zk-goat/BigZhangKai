@@ -1,6 +1,6 @@
 // 一局游戏的全部状态。物理引擎每帧都在变，这里用一个可变对象集中管理，各模块只读写这一处。
-import { FIELD, STORAGE_KEYS } from './config.js?v=cc9230d0';
-import { store } from './skin.js?v=4723788e';
+import { FIELD, STORAGE_KEYS } from './config.js?v=21648a52';
+import { store } from './skin.js?v=83f93ead';
 
 export const state = {
   engine: null,
@@ -12,6 +12,8 @@ export const state = {
   currentShiny: false,
   nextShiny: false,
   shinySeen: 0,
+  fusions: 0,       // 本局大张楷合体次数
+  dangerShift: 0,   // 危险线因合体下移了多少
   aimX: FIELD.width / 2,
   canDrop: true,
   over: false,
@@ -30,7 +32,7 @@ export const state = {
 export function resetRound(engine, firstNext) {
   Object.assign(state, {
     engine,
-    score: 0, topLevel: 0, current: 0, next: firstNext, currentShiny: false, nextShiny: false, shinySeen: 0,
+    score: 0, topLevel: 0, current: 0, next: firstNext, currentShiny: false, nextShiny: false, shinySeen: 0, fusions: 0, dangerShift: 0,
     aimX: FIELD.width / 2, canDrop: true, over: false, paused: false, wonThisGame: false,
     dangerSince: 0, mergeCount: 0, maxCombo: 0, startedAt: Date.now(), combo: 0, lastMergeAt: 0
   });

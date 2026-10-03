@@ -7,6 +7,8 @@ import { state } from './state.js';
 import { onRoundOver } from './rankboard.js';
 import { clearSave } from './save.js';
 import { loadDex } from './dex.js';
+import { onRoundEnd, takeRoundUnlocks } from './achievements.js';
+import { showRoundUnlocks } from './achieve-ui.js';
 import { $ } from './dom.js';
 
 const BOARD_SIZE = 5;
@@ -90,6 +92,7 @@ export function gameOver() {
   const { score, topLevel, mergeCount, maxCombo, startedAt, wonThisGame } = state;
   state.over = true;
   clearSave();
+  onRoundEnd({ score, playedMs: Date.now() - startedAt });
   sfx.over();
 
   const run = { score, lv: topLevel, at: Date.now() };
@@ -101,7 +104,7 @@ export function gameOver() {
 
   $('report-date').textContent = new Date().toLocaleDateString('zh-CN', { month: 'long', day: 'numeric' });
   $('report-stamp').hidden = !isRecord;
-  $('report-verdict').textContent = wonThisGame ? '合出过大张楷！' : verdictFor(topLevel);
+  $('report-verdict').textContent = state.fusions > 0 ? `张楷合体 ×${state.fusions}！` : wonThisGame ? '合出过大张楷！' : verdictFor(topLevel);
   $('report-hero').style.setProperty('--lv', LEVELS[topLevel].color);
   paintLevel($('final-pic'), topLevel);
   $('final-title').textContent = title;
@@ -116,10 +119,12 @@ export function gameOver() {
   $('report-foot').textContent = '截图发群里 · ' + SHARE_URL;
   renderBoard(board, run);
   renderDex(state.shinySeen);
+  showRoundUnlocks(takeRoundUnlocks());
   onRoundOver();
 
   shareText = `我在「合成大张楷」拿了 ${score} 分，最高合成到第 ${topLevel + 1} 级「${name}」，称号：${title}`
     + (isRecord ? '，刷新了我的最高纪录' : '')
+    + (state.fusions > 0 ? `，张楷合体 ${state.fusions} 次` : '')
     + (state.shinySeen > 0 ? `，还遇到了 ${state.shinySeen} 个黄金张楷` : '')
     + (wonThisGame ? '。我已经合出大张楷了，你呢？' : '。你能合出大张楷吗？')
     + ' ' + SHARE_URL;

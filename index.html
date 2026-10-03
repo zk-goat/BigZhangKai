@@ -15,6 +15,7 @@
     <button id="btn-rank" type="button" hidden>排行</button>
     <button id="btn-notice" type="button">公告</button>
     <button id="btn-book" type="button" hidden>留言</button>
+    <button id="btn-achv" type="button">成就</button>
   </div>
   <div class="score"><span id="score">0</span><small>最高 <span id="best">0</span></small></div>
 </div>
@@ -48,6 +49,20 @@
     <input id="welcome-name" type="text" maxlength="12" placeholder="你的昵称（最多 12 个字）" autocomplete="nickname">
     <button id="btn-welcome" type="button">开始玩</button>
     <p class="welcome-msg" id="welcome-msg" role="status"></p>
+  </div>
+</div>
+
+<div class="achv-toast" id="achv-toast" role="status" hidden>
+  <span class="achv-toast-icon">🏆</span>
+  <span>解锁成就：<b id="achv-toast-name"></b></span>
+</div>
+
+<div class="overlay" id="achv-page" hidden>
+  <div class="card achv-card">
+    <h2>成就</h2>
+    <p class="achv-count" id="achv-count"></p>
+    <div class="achv-list" id="achv-list"></div>
+    <div class="actions"><button id="achv-close" type="button">关闭</button></div>
   </div>
 </div>
 
@@ -117,6 +132,7 @@
         <div><b id="stat-combo">0</b><span>最大连击</span></div>
         <div><b id="stat-time">0:00</b><span>用时</span></div>
       </div>
+      <p class="report-achv" id="report-achv" hidden></p>
       <div class="dex" id="dex">
         <p class="dex-line" id="dex-line"></p>
         <div class="dex-dots" id="dex-dots"></div>
