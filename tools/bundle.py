@@ -83,6 +83,10 @@ def bundle_js():
         rel = f"images/{img.name}"
         if rel in js:
             js = js.replace(f"'{rel}'", f"'{data_uri(img, 'image/jpeg')}'")
+    for img in sorted((ROOT / "images").glob("crown-*.png")):
+        rel = f"images/{img.name}"
+        if rel in js:
+            js = js.replace(f"'{rel}'", f"'{data_uri(img, 'image/png')}'")
     if re.search(r"'images/[^']+'", js):
         sys.exit("config.js 里有找不到文件的照片路径")
     return js

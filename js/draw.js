@@ -2,8 +2,21 @@
 import { LEVELS, MAX, COLORS } from './config.js';
 import { skin, photoImg, shapeFor } from './skin.js';
 import { drawGoldPhoto, drawTwinkle, drawGoldRing } from './shine.js';
+import { loadImage } from './trace.js';
 
 const NAME_MIN_R = 40;  // 半径小于它不写名字
+let crownSprite = null;
+
+export async function initCrown() {
+  try {
+    const image = await loadImage('images/crown-royal-v2.png');
+    // 启动时预缩放一次，避免每帧处理大图；源图的透明留白不参与佩戴尺寸。
+    const sprite = document.createElement('canvas');
+    sprite.width = 384; sprite.height = 176;
+    sprite.getContext('2d').drawImage(image, 132, 84, 1510, 692, 0, 0, 384, 176);
+    crownSprite = sprite;
+  } catch { /* 网络失败时继续使用矢量皇冠，游戏照常启动。 */ }
+}
 
 export function drawKai(ctx, x, y, r, lv, angle = 0, shiny = false) {
   ctx.save();
@@ -31,7 +44,7 @@ function drawPhoto(ctx, r, lv, { s, sh, bottom, verts }, img, shiny) {
   if (lv === MAX) {
     // 第 14 级照片的人头偏左，皇冠跟着照片里的头走，而不是跟着整张照片的重心走。
     ctx.translate(x + w * 0.29, y + h * 0.055);
-    drawCrown(ctx, w * 0.35);
+    drawCrown(ctx, w * 0.42);
   }
 }
 
@@ -75,6 +88,14 @@ function drawFace(ctx, r) {
 function drawCrown(ctx, width) {
   ctx.save();
   ctx.rotate(-0.07);
+  if (crownSprite) {
+    const height = width * crownSprite.height / crownSprite.width;
+    ctx.shadowColor = 'rgba(46,28,7,.25)';
+    ctx.shadowBlur = 1.5; ctx.shadowOffsetY = 1;
+    ctx.drawImage(crownSprite, -width / 2, -height + width * 0.025, width, height);
+    ctx.restore();
+    return;
+  }
   ctx.scale(width, width);
   // 用归一化坐标画，游戏内、庆祝页和战报上的小图都能保持同一比例。
   ctx.beginPath();

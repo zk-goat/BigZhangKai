@@ -1,16 +1,17 @@
 // 启动：加载照片 → 开局 → 绑定按钮。链接带 ?test=win / ?test=over（可加 &score=分数）时直接展示庆祝画面 / 示例战报。
 import { FIELD, MAX } from './config.js?v=21648a52';
 import { initSkin } from './skin.js?v=83f93ead';
+import { initCrown } from './draw.js?v=1c93f03c';
 import { isMuted, toggleMuted } from './audio.js?v=b9710e55';
 import { state } from './state.js?v=5f7e2107';
-import { copyShare, gameOver } from './report.js?v=570e9a3f';
-import { startGame, restoreGame, loop, fit, bindInput, makeKai, debugSnapshot, simulateGames } from './game.js?v=a85704aa';
+import { copyShare, gameOver } from './report.js?v=f93e3860';
+import { startGame, restoreGame, loop, fit, bindInput, makeKai, debugSnapshot, simulateGames } from './game.js?v=d32d4cf0';
 import { readSave } from './save.js?v=17e3bab3';
 import { bindRankboard, flushPending } from './rankboard.js?v=c9fb7455';
-import { bindWelcome, showWelcomeIfNeeded, needsWelcome } from './welcome.js?v=b1e0f739';
-import { bindNotice, showNoticeIfNew } from './notice.js?v=b46af797';
+import { bindWelcome, showWelcomeIfNeeded, needsWelcome } from './welcome.js?v=8528881e';
+import { bindNotice, showNoticeIfNew } from './notice.js?v=02b974f5';
 import { bindGuestbook } from './guestbook.js?v=51590444';
-import { bindGroup } from './group.js?v=282c1c80';
+import { bindGroup } from './group.js?v=a948b4a7';
 import { syncMyAvatar, syncBadges } from './profile.js?v=f8ea613e';
 import { bindAchievements } from './achieve-ui.js?v=2a181da3';
 import { onMute, unlockedCount } from './achievements.js?v=6e59b0e1';
@@ -73,7 +74,7 @@ async function boot() {
   fit();
   bindInput();
   bindButtons();
-  await initSkin();
+  await Promise.all([initSkin(), initCrown()]);
   // 有上一局的存档就接着玩（测试链接不恢复，免得干扰）
   const saved = /[?&]test=/.test(location.search) ? null : readSave();
   if (saved) {

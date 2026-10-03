@@ -33,11 +33,12 @@ def main():
 
     # JS 之间互相引用：先按“自身内容 + 依赖的版本号”算版本号，依赖变了引用方也会变
     sources = {p.name: p.read_text(encoding="utf-8") for p in sorted((ROOT / "js").glob("*.js"))}
-    # 照片在 config.js 里按相对路径加载：先给照片地址加版本号，config.js 自己的版本号才会随照片变化
-    sources["config.js"] = re.sub(
-        r"'(images/[\w.-]+\.webp)'",
-        lambda m: f"'{m.group(1)}?v={short_hash((ROOT / m.group(1)).read_bytes())}'",
-        sources["config.js"])
+    # 图片先加版本号，再计算引用模块的版本，确保换皇冠或群二维码后手机能更新。
+    for name in sources:
+        sources[name] = re.sub(
+            r"'(images/[\w.-]+\.(?:webp|png|jpg))'",
+            lambda m: f"'{m.group(1)}?v={short_hash((ROOT / m.group(1)).read_bytes())}'",
+            sources[name])
     versions = {}
 
     def version_of(name, stack=()):

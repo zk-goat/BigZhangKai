@@ -2,7 +2,7 @@
 // 连不上排行榜时也放行：昵称先存在本机，等下次上榜时再向服务器确认。
 import { STORAGE_KEYS, MAX } from './config.js?v=21648a52';
 import { store } from './skin.js?v=83f93ead';
-import { paintLevel } from './draw.js?v=8453b96a';
+import { paintLevel } from './draw.js?v=1c93f03c';
 import { state } from './state.js?v=5f7e2107';
 import { $ } from './dom.js?v=5b57db68';
 import { leaderboardEnabled, claimName, cleanName, canPersist } from './leaderboard.js?v=feae38ca';

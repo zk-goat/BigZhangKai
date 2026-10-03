@@ -7,7 +7,7 @@ let pausedByGroup = false;
 export function bindGroup() {
   const image = $('group-qr');
   image.addEventListener('load', () => { $('btn-group').hidden = false; });
-  image.src = 'images/wechat-group-2026-10-11.jpg';
+  image.src = 'images/wechat-group-2026-10-11.jpg?v=18ba75c3';
 
   $('btn-group').addEventListener('click', () => {
     pausedByGroup = !state.over && !state.paused;

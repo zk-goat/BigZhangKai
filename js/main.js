@@ -1,6 +1,7 @@
 // 启动：加载照片 → 开局 → 绑定按钮。链接带 ?test=win / ?test=over（可加 &score=分数）时直接展示庆祝画面 / 示例战报。
 import { FIELD, MAX } from './config.js';
 import { initSkin } from './skin.js';
+import { initCrown } from './draw.js';
 import { isMuted, toggleMuted } from './audio.js';
 import { state } from './state.js';
 import { copyShare, gameOver } from './report.js';
@@ -73,7 +74,7 @@ async function boot() {
   fit();
   bindInput();
   bindButtons();
-  await initSkin();
+  await Promise.all([initSkin(), initCrown()]);
   // 有上一局的存档就接着玩（测试链接不恢复，免得干扰）
   const saved = /[?&]test=/.test(location.search) ? null : readSave();
   if (saved) {
