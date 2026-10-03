@@ -8,8 +8,9 @@ import { startGame, restoreGame, loop, fit, bindInput, makeKai, debugSnapshot, s
 import { readSave } from './save.js?v=17e3bab3';
 import { bindRankboard, flushPending } from './rankboard.js?v=c9fb7455';
 import { bindWelcome, showWelcomeIfNeeded, needsWelcome } from './welcome.js?v=909b6eb1';
-import { bindNotice, showNoticeIfNew } from './notice.js?v=f8f18094';
+import { bindNotice, showNoticeIfNew } from './notice.js?v=5783e327';
 import { bindGuestbook } from './guestbook.js?v=51590444';
+import { bindGroup } from './group.js?v=282c1c80';
 import { syncMyAvatar, syncBadges } from './profile.js?v=f8ea613e';
 import { bindAchievements } from './achieve-ui.js?v=2a181da3';
 import { onMute, unlockedCount } from './achievements.js?v=6e59b0e1';
@@ -42,6 +43,7 @@ function bindButtons() {
   bindWelcome();
   bindNotice();
   bindGuestbook();
+  bindGroup();
   bindAchievements({ onCountChanged: syncBadges });
   renderSoundBtn();
 }

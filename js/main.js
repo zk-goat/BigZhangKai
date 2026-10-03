@@ -10,6 +10,7 @@ import { bindRankboard, flushPending } from './rankboard.js';
 import { bindWelcome, showWelcomeIfNeeded, needsWelcome } from './welcome.js';
 import { bindNotice, showNoticeIfNew } from './notice.js';
 import { bindGuestbook } from './guestbook.js';
+import { bindGroup } from './group.js';
 import { syncMyAvatar, syncBadges } from './profile.js';
 import { bindAchievements } from './achieve-ui.js';
 import { onMute, unlockedCount } from './achievements.js';
@@ -42,6 +43,7 @@ function bindButtons() {
   bindWelcome();
   bindNotice();
   bindGuestbook();
+  bindGroup();
   bindAchievements({ onCountChanged: syncBadges });
   renderSoundBtn();
 }

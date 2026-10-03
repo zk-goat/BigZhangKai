@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>合成大张楷</title>
-<link rel="stylesheet" href="css/style.css?v=8f5c2e6d">
+<link rel="stylesheet" href="css/style.css?v=e8e22801">
 </head>
 <body>
 <div class="top">
@@ -15,6 +15,7 @@
     <button id="btn-rank" type="button" hidden>排行</button>
     <button id="btn-notice" type="button">公告</button>
     <button id="btn-book" type="button" hidden>留言</button>
+    <button id="btn-group" type="button" hidden>加群</button>
     <button id="btn-achv" type="button">成就</button>
   </div>
   <div class="score"><span id="score">0</span><small>最高 <span id="best">0</span></small></div>
@@ -91,6 +92,16 @@
     <h2>更新公告</h2>
     <div class="notice-list" id="notice-list"></div>
     <div class="actions"><button id="btn-notice-close" type="button">知道了</button></div>
+  </div>
+</div>
+
+<div class="overlay" id="group" hidden>
+  <div class="card group-card" role="dialog" aria-modal="true" aria-labelledby="group-title">
+    <h2 id="group-title">一起玩合成大张楷</h2>
+    <p>长按图片，在微信里识别加群</p>
+    <img id="group-qr" alt="合成大张楷微信群二维码，10 月 11 日前有效" width="400" height="572">
+    <p>二维码 10 月 11 日前有效</p>
+    <div class="actions"><button id="btn-group-close" type="button">关闭</button></div>
   </div>
 </div>
 
@@ -171,6 +182,6 @@
 </div>
 
 <script src="vendor/matter.min.js?v=7f2901e3"></script>
-<script type="module" src="js/main.js?v=939b8020"></script>
+<script type="module" src="js/main.js?v=25ff2b96"></script>
 </body>
 </html>

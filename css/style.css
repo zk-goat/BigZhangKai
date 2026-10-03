@@ -201,6 +201,16 @@ canvas {
 .notice-item + .notice-item { border-top: 2px dashed var(--line); padding-top: 12px; }
 .notice-item:not(.latest) ul { color: var(--muted); }
 
+/* 微信群二维码：允许手机长按图片识别 */
+.group-card { align-items: center; text-align: center; }
+.group-card img {
+  display: block; width: min(400px, 100%); height: auto;
+  object-fit: contain; background: #fff; box-sizing: border-box;
+  border: 2px solid var(--line); border-radius: 12px;
+  user-select: auto; -webkit-user-select: auto; -webkit-touch-callout: default;
+}
+.group-card .actions { width: 100%; }
+
 /* 闪光图鉴 */
 .dex { width: 100%; display: grid; gap: 6px; }
 .dex-line { font-size: .8rem !important; color: var(--muted); }

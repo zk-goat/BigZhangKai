@@ -2,6 +2,12 @@
 // 写法：每条一句话、只说有什么新东西，不解释原理。
 export const ANNOUNCEMENTS = [
   {
+    id: '2026-10-04-group',
+    date: '10 月 4 日',
+    title: '微信群入口',
+    items: ['顶部“加群”：扫码加入游戏群']
+  },
+  {
     id: '2026-10-03-achv',
     date: '10 月 3 日',
     title: '成就和张楷合体',
