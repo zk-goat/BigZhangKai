@@ -1,5 +1,5 @@
 // 闪光张楷：随机出现、合成遗传、得分倍率。纯函数，可单独测试。
-import { SHINY } from './config.js?v=70a9d4eb';
+import { SHINY } from './config.js?v=c9d81fa9';
 
 // 新出现的张楷（投放或合成产物）是不是闪光；parentShiny 表示参与合成的两个里有没有闪光
 export function rollShiny(parentShiny = false, rand = Math.random) {

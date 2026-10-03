@@ -1,6 +1,6 @@
 // 一局游戏的全部状态。物理引擎每帧都在变，这里用一个可变对象集中管理，各模块只读写这一处。
-import { FIELD, STORAGE_KEYS } from './config.js?v=70a9d4eb';
-import { store } from './skin.js?v=b3832cb8';
+import { FIELD, STORAGE_KEYS } from './config.js?v=c9d81fa9';
+import { store } from './skin.js?v=33e28a2f';
 
 export const state = {
   engine: null,

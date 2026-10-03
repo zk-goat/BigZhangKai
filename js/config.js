@@ -66,7 +66,7 @@ export const SPAWN = [
 
 // 黄金张楷（代码里叫 shiny）：每个新出现的张楷（投放或合成产物）都有 chance 的概率是黄金的；
 // 用黄金张楷合成时结果按 inherit 概率保留；scoreMul 是有黄金张楷参与的那次合成的得分倍率
-export const SHINY = { chance: 0.005, inherit: 0.5, scoreMul: 2 };
+export const SHINY = { chance: 0.01, inherit: 0.5, scoreMul: 2 };   // 1%：一局大约遇到 4～5 个
 
 // 照片转碰撞轮廓
 export const TRACE = {

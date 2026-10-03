@@ -2,6 +2,12 @@
 // 写法：每条一句话、只说有什么新东西，不解释原理。
 export const ANNOUNCEMENTS = [
   {
+    id: '2026-10-03-gold-up',
+    date: '10 月 3 日',
+    title: '黄金张楷更常见了',
+    items: ['黄金张楷的出现概率翻倍']
+  },
+  {
     id: '2026-10-03-weekly',
     date: '10 月 3 日',
     title: '周榜上线',

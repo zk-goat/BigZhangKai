@@ -1,8 +1,8 @@
 // 公告牌：有没看过的更新时自动弹一次；顶栏“公告”按钮随时回看。
-import { STORAGE_KEYS } from './config.js?v=70a9d4eb';
-import { ANNOUNCEMENTS } from './announcements.js?v=9cf72505';
-import { store } from './skin.js?v=b3832cb8';
-import { state } from './state.js?v=123f223b';
+import { STORAGE_KEYS } from './config.js?v=c9d81fa9';
+import { ANNOUNCEMENTS } from './announcements.js?v=c97952c6';
+import { store } from './skin.js?v=33e28a2f';
+import { state } from './state.js?v=7580895e';
 import { $ } from './dom.js?v=5b57db68';
 
 const latestId = () => (ANNOUNCEMENTS[0] ? ANNOUNCEMENTS[0].id : '');

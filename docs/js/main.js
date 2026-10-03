@@ -1,16 +1,16 @@
 // 启动：加载照片 → 开局 → 绑定按钮。链接带 ?test=win / ?test=over（可加 &score=分数）时直接展示庆祝画面 / 示例战报。
-import { FIELD, MAX } from './config.js?v=70a9d4eb';
-import { initSkin } from './skin.js?v=b3832cb8';
-import { isMuted, toggleMuted } from './audio.js?v=796a23db';
-import { state } from './state.js?v=123f223b';
-import { copyShare, gameOver } from './report.js?v=fb6f0e7e';
-import { startGame, restoreGame, loop, fit, bindInput, makeKai, debugSnapshot, simulateGames } from './game.js?v=9cc56fc3';
-import { readSave } from './save.js?v=36204485';
-import { bindRankboard, flushPending } from './rankboard.js?v=e5301e4a';
-import { bindWelcome, showWelcomeIfNeeded, needsWelcome } from './welcome.js?v=ccf7b53f';
-import { bindNotice, showNoticeIfNew } from './notice.js?v=4c12c482';
-import { bindGuestbook } from './guestbook.js?v=d4bcb60c';
-import { syncMyAvatar } from './profile.js?v=afaeee37';
+import { FIELD, MAX } from './config.js?v=c9d81fa9';
+import { initSkin } from './skin.js?v=33e28a2f';
+import { isMuted, toggleMuted } from './audio.js?v=31ef1341';
+import { state } from './state.js?v=7580895e';
+import { copyShare, gameOver } from './report.js?v=7755e36e';
+import { startGame, restoreGame, loop, fit, bindInput, makeKai, debugSnapshot, simulateGames } from './game.js?v=c8642a49';
+import { readSave } from './save.js?v=c1657aee';
+import { bindRankboard, flushPending } from './rankboard.js?v=65575f93';
+import { bindWelcome, showWelcomeIfNeeded, needsWelcome } from './welcome.js?v=55f7ec9e';
+import { bindNotice, showNoticeIfNew } from './notice.js?v=8a9b10eb';
+import { bindGuestbook } from './guestbook.js?v=407fa702';
+import { syncMyAvatar } from './profile.js?v=ded5ee45';
 import { $ } from './dom.js?v=5b57db68';
 
 function renderSoundBtn() {

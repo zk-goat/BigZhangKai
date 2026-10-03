@@ -1,13 +1,13 @@
 // 排行榜界面：顶栏“排行榜”弹窗 + 战报卡上的自动上榜。
 // 第一次结束时占一个昵称（全班唯一），以后每局结束自动上传；破了自己本周最好成绩才传（历史最高自然也在里面）。
-import { STORAGE_KEYS } from './config.js?v=70a9d4eb';
-import { skin, store } from './skin.js?v=b3832cb8';
-import { state } from './state.js?v=123f223b';
+import { STORAGE_KEYS } from './config.js?v=c9d81fa9';
+import { skin, store } from './skin.js?v=33e28a2f';
+import { state } from './state.js?v=7580895e';
 import { $ } from './dom.js?v=5b57db68';
-import { leaderboardEnabled, fetchTop, myWeekRank, submitScore, claimName, cleanName, canPersist } from './leaderboard.js?v=3d24f541';
+import { leaderboardEnabled, fetchTop, myWeekRank, submitScore, claimName, cleanName, canPersist } from './leaderboard.js?v=21f8d08e';
 import { weekKey, daysLeft } from './week.js?v=8858cfea';
-import { avatarEl, makeAvatar } from './avatar.js?v=bdd1ed8d';
-import { myAvatar, uploadAvatar, renderMeBar } from './profile.js?v=afaeee37';
+import { avatarEl, makeAvatar } from './avatar.js?v=a97979a3';
+import { myAvatar, uploadAvatar, renderMeBar } from './profile.js?v=ded5ee45';
 
 const playerName = () => store.get(STORAGE_KEYS.playerName) || '';
 const uploadedBest = () => Number(store.get(STORAGE_KEYS.uploadedBest)) || 0;

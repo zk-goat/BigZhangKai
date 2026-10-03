@@ -507,7 +507,7 @@ const SPAWN = [
 
 // 黄金张楷（代码里叫 shiny）：每个新出现的张楷（投放或合成产物）都有 chance 的概率是黄金的；
 // 用黄金张楷合成时结果按 inherit 概率保留；scoreMul 是有黄金张楷参与的那次合成的得分倍率
-const SHINY = { chance: 0.005, inherit: 0.5, scoreMul: 2 };
+const SHINY = { chance: 0.01, inherit: 0.5, scoreMul: 2 };   // 1%：一局大约遇到 4～5 个
 
 // 照片转碰撞轮廓
 const TRACE = {
@@ -2450,6 +2450,12 @@ function bindWelcome() {
 // 更新公告：最新的放最前面，id 不能重复（没看过最新一条的玩家打开游戏会自动弹出）。
 // 写法：每条一句话、只说有什么新东西，不解释原理。
 const ANNOUNCEMENTS = [
+  {
+    id: '2026-10-03-gold-up',
+    date: '10 月 3 日',
+    title: '黄金张楷更常见了',
+    items: ['黄金张楷的出现概率翻倍']
+  },
   {
     id: '2026-10-03-weekly',
     date: '10 月 3 日',
